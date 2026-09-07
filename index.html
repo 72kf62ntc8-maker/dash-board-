@@ -1,0 +1,867 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Chaston's Dashboard</title>
+<!--
+  Chaston's Dashboard — a self-contained personal command center.
+
+  ONE file on purpose: HTML + CSS + JS inline, no build step, no dependencies.
+  Deploys as a static file (Vercel serves it directly), and everything it
+  stores lives in the browser's localStorage under keys prefixed "cd_" — so
+  the app is fully usable offline and your data never leaves the device.
+
+  Design: the JARVIS "red command center" look — deep black + oxblood
+  surfaces, vermilion and warm-white instrument accents, an arc-reactor dial,
+  monospace instrument labels. Reduced-motion is respected.
+
+  Sections (left nav): Command, Fitness, Food, Planner, Calendar, Journal,
+  Reselling, Money. Fitness is the built-out one — lifting + MMA/mat work, a
+  weekly training plan, a rules "coach", and an Obsidian import.
+-->
+<style>
+  :root{
+    color-scheme: dark;
+    --bg:#060506; --panel:#100c0d; --panel-2:#160e10; --line:#3c2427;
+    --line-strong:#74302d; --accent:#ff766d; --accent-hot:#ffd1c7;
+    --accent-bright:#ff5548; --text:#fff0ed; --muted:#bca4a3; --faint:#8b4b47;
+    --success:#4ed8a0; --warn:#e0a33e; --danger:#ff6356; --radius:4px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:radial-gradient(ellipse at 80% 0,#50100e24,transparent 50%),var(--bg);
+    color:var(--text);
+    font:16px/1.5 "Segoe UI",system-ui,-apple-system,Arial,sans-serif;
+    min-height:100vh;
+  }
+  button,input,textarea,select{font:inherit;color:inherit}
+  button{cursor:pointer;background:none;border:0}
+  button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
+    outline:2px solid var(--accent);outline-offset:3px
+  }
+  .eyebrow{font:11px/1.5 "Courier New",monospace;letter-spacing:2px;color:var(--muted);text-transform:uppercase}
+  [hidden]{display:none!important}
+
+  /* ---- Shell: fixed left rail + scrolling main ---- */
+  aside{
+    position:fixed;inset:0 auto 0 0;width:216px;padding:32px 18px;
+    background:linear-gradient(90deg,#090708,#130b0c);border-right:1px solid var(--line);
+    display:flex;flex-direction:column;z-index:20;
+  }
+  .brand{display:flex;align-items:center;gap:10px;color:var(--text);text-decoration:none;font-size:22px;font-weight:650;letter-spacing:3px}
+  .brand-mark{color:var(--accent-bright);font-size:26px;text-shadow:0 0 18px #ff3b29}
+  .brand .sub{display:block;font:9px/2 "Courier New",monospace;letter-spacing:2px;color:var(--faint)}
+  nav{display:grid;gap:4px;margin-top:34px}
+  nav button{display:flex;align-items:center;gap:12px;color:var(--muted);padding:10px 12px;text-align:left;border-radius:5px;border:1px solid transparent;font-size:14px;width:100%}
+  nav button .ic{width:22px;font-size:16px;text-align:center;color:var(--faint)}
+  nav button:hover{color:var(--text);background:#261113}
+  nav button.active{color:var(--accent-hot);border-color:var(--line-strong);background:linear-gradient(90deg,#541a19aa,#1c0d0d);box-shadow:inset 2px 0 var(--accent)}
+  nav button.active .ic{color:var(--accent)}
+  .side-bottom{margin-top:auto;font:10px "Courier New",monospace;letter-spacing:1px;color:var(--faint)}
+  .status-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 10px #ff342e;margin-right:6px}
+
+  main{margin-left:216px;padding:0 34px 60px;max-width:1500px}
+  header{height:74px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line)}
+  .breadcrumb{font:11px "Courier New",monospace;letter-spacing:1.5px;color:var(--muted)}
+  .breadcrumb span{margin:0 10px;color:#47606d}
+  .breadcrumb strong{font-weight:400;color:var(--accent)}
+  .header-right{display:flex;align-items:center;gap:18px;font:12px "Courier New",monospace;color:var(--muted)}
+  .avatar{border:1px solid var(--line);padding:6px 11px;border-radius:50%}
+
+  .page-heading{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;padding:28px 0 22px}
+  h1{font-size:32px;letter-spacing:-1px;line-height:1.15;margin:6px 0 0;font-weight:500}
+  h1 span,.accent{color:var(--accent)}
+  .page-heading .lead{color:var(--muted);font-size:14px;margin:8px 0 0}
+  .command-button{display:flex;gap:14px;align-items:center;border:1px solid var(--line);background:var(--panel);color:var(--muted);padding:11px 14px;border-radius:5px;font-size:14px}
+  kbd{font:10px "Courier New",monospace;border:1px solid var(--line-strong);padding:2px 5px;border-radius:3px}
+
+  /* ---- Panels & primitives ---- */
+  .panel{border:1px solid var(--line);border-radius:var(--radius);background:linear-gradient(120deg,#160e10,#0b0809);padding:20px;margin-bottom:16px}
+  .grid{display:grid;gap:16px}
+  .cols-2{grid-template-columns:1.4fr 1fr}
+  .section-title{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:10px}
+  .section-title h2{font-size:16px;font-weight:500;margin:0}
+  .primary{background:linear-gradient(#ffa08b,#ff6d59);color:#240b09;border:1px solid #ffb7a06b;padding:9px 15px;border-radius:var(--radius);font-size:14px;font-weight:600;box-shadow:0 0 22px #ff362119}
+  .primary:hover{background:#ffb19b}
+  .ghost{background:none;border:0;color:var(--accent);font-size:14px;padding:6px 0}
+  .btn{border:1px solid var(--line-strong);background:var(--panel-2);color:var(--text);padding:9px 14px;border-radius:var(--radius);font-size:14px}
+  .btn:hover{background:#311718;border-color:var(--accent)}
+  label{display:block;font-size:13px;margin:14px 0 6px;color:var(--muted)}
+  input,textarea,select{width:100%;border:1px solid var(--line-strong);border-radius:var(--radius);background:#0b0708;padding:11px;font-size:15px}
+  textarea{min-height:90px;resize:vertical;font-family:inherit}
+  .muted{color:var(--muted)}
+  .faint{color:var(--faint)}
+  .row{display:flex;align-items:center;gap:10px}
+  .chip{padding:6px 11px;border:1px solid var(--line);border-radius:var(--radius);font-size:13px;color:var(--muted);font-weight:600}
+  .chip.on{background:rgba(255,118,109,.13);border-color:var(--accent);color:var(--text)}
+  .chip-row{display:flex;flex-wrap:wrap;gap:6px}
+  .tag{font:10px "Courier New",monospace;letter-spacing:1px;color:var(--accent)}
+
+  /* ---- Command: quick actions ---- */
+  .actions{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .action{display:flex;align-items:center;gap:12px;text-align:left;padding:15px;border:1px solid var(--line-strong);background:linear-gradient(115deg,#1b1012,#100b0d);border-radius:2px;color:var(--text);position:relative}
+  .action:before{content:'';position:absolute;top:-1px;left:-1px;width:9px;height:9px;border-left:1px solid #bf6458;border-top:1px solid #bf6458}
+  .action:hover{background:#311718;border-color:var(--accent)}
+  .action .icon{font-size:20px;color:var(--accent);width:24px;text-align:center;text-shadow:0 0 12px #ff4c2c66}
+  .action strong{display:block;font-size:14px;font-weight:500}
+  .action small{color:var(--muted);font-size:12px}
+  .action .arrow{margin-left:auto;color:var(--faint)}
+
+  /* ---- Reactor + vitals rings ---- */
+  .hero{display:flex;align-items:center;justify-content:space-between;gap:20px;overflow:hidden;position:relative;
+    border:1px solid #844039;border-radius:var(--radius);padding:26px 32px;min-height:220px;
+    background:radial-gradient(ellipse at 72% 48%,#ac231c24 0,transparent 55%),linear-gradient(115deg,#170a0c,#080607 60%,#270b0d);
+    box-shadow:inset 0 1px #ff9b7255,inset 0 -1px #ff4d3b44}
+  .hero-copy{z-index:1;max-width:60%}
+  .hero h2{font-size:30px;font-weight:350;line-height:1.15;margin:10px 0 8px}
+  .hero h2 span{color:var(--accent-hot)}
+  .hero p{color:var(--muted);font-size:14px;margin:0}
+  .rings{display:flex;gap:22px;flex-wrap:wrap}
+  .ring{position:relative;width:118px;height:118px;flex-shrink:0}
+  .ring svg{transform:rotate(-90deg)}
+  .ring .val{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+  .ring .val b{font-size:22px;font-weight:600;color:var(--text)}
+  .ring .val small{font:9px "Courier New",monospace;letter-spacing:1px;color:var(--muted);margin-top:2px}
+
+  .reactor{position:relative;width:150px;height:150px;flex-shrink:0}
+  .reactor .orbit{position:absolute;border-radius:50%}
+  .reactor .o1{inset:0;border:2px dashed rgba(255,85,72,.42);animation:spin 90s linear infinite}
+  .reactor .o2{inset:22px;border:3px solid rgba(255,118,109,.5);border-left-color:transparent;border-right-color:transparent;animation:spin 40s linear infinite reverse}
+  .reactor .o3{inset:44px;border:1px solid #ff9687;box-shadow:0 0 22px #48dffb00,inset 0 0 18px #ff4c2c22}
+  .reactor .core{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+  .reactor .core b{font-size:30px;color:var(--accent-hot);text-shadow:0 0 16px #ff5a3c99}
+  .reactor .core small{font:8px "Courier New",monospace;letter-spacing:2px;color:var(--accent)}
+
+  /* ---- Lists / entries ---- */
+  .entry{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-top:1px solid var(--line)}
+  .entry:first-of-type{border-top:0}
+  .entry .body{flex:1}
+  .entry strong{font-size:14px;font-weight:500;overflow-wrap:anywhere}
+  .entry small{display:block;color:var(--accent);font:11px "Courier New",monospace;letter-spacing:.5px;margin-top:2px}
+  .entry p{color:var(--muted);font-size:13px;margin:5px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}
+  .entry .del{color:var(--faint);font-size:18px;padding:0 4px}
+  .entry .del:hover{color:var(--danger)}
+  .empty{color:var(--muted);font-size:14px;padding:14px 0}
+  .list-metric{display:flex;justify-content:space-between;font-size:14px;padding:6px 0;border-top:1px solid var(--line)}
+  .list-metric:first-child{border-top:0}
+  .list-metric .k{color:var(--muted)}
+  .big{font-size:30px;font-weight:600;letter-spacing:-.5px}
+  .coach-line{font-size:14px;margin:0 0 8px;padding-left:12px;border-left:2px solid var(--line-strong)}
+  .coach-warn{border-left-color:var(--warn);color:#f0c886}
+  .coach-good{border-left-color:var(--success);color:#8fe6c2}
+  .coach-info{border-left-color:var(--line-strong);color:var(--muted)}
+
+  /* ---- Dialogs ---- */
+  dialog{width:min(480px,calc(100% - 28px));border:1px solid #975348;border-radius:10px;background:#170e10;color:var(--text);padding:24px}
+  dialog::backdrop{background:#060203d9;backdrop-filter:blur(4px)}
+  .dialog-top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+  .dialog-top h2{font-size:20px;margin:0}
+  .close{color:var(--muted);font-size:26px;line-height:1;padding:0 4px}
+  .dialog-actions{display:flex;gap:10px;margin-top:20px}
+  .dialog-actions .primary{flex:1}
+  #search-results{display:grid;gap:7px;margin-top:14px;max-height:52vh;overflow:auto}
+  #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--accent-hot);color:#2d0c08;border-radius:5px;padding:12px 20px;font-weight:600;z-index:60}
+
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){.reactor .orbit{animation:none!important}}
+
+  /* ---- Mobile: rail becomes a top scroller, matching the reference ---- */
+  @media (max-width:820px){
+    aside{position:static;width:auto;padding:14px 16px;border-right:0;border-bottom:1px solid var(--line);flex-direction:row;align-items:center;gap:14px}
+    .brand .sub,.side-bottom,aside .eyebrow{display:none}
+    nav{grid-auto-flow:column;grid-template-columns:none;overflow:auto;margin:0;gap:6px}
+    nav button{white-space:nowrap;padding:8px 10px}
+    nav button .ic{display:none}
+    main{margin-left:0;padding:0 16px 48px}
+    .cols-2{grid-template-columns:1fr}
+    .actions{grid-template-columns:repeat(2,1fr)}
+    .hero{flex-direction:column;align-items:flex-start}
+    .hero-copy{max-width:100%}
+    .page-heading{flex-direction:column;align-items:flex-start}
+    .command-button{width:100%;justify-content:center}
+  }
+</style>
+</head>
+<body>
+<aside>
+  <a class="brand" href="#" onclick="return false"><span class="brand-mark">◈</span><span>CHASTON<span class="sub">PERSONAL OS / 01</span></span></a>
+  <p class="eyebrow" style="margin:26px 0 0">Workspace</p>
+  <nav id="navigation" aria-label="Sections"></nav>
+  <div class="side-bottom"><span class="status-dot"></span>LOCAL · ON DEVICE<br /><span style="font-family:'Segoe UI'">Your day. In command.</span></div>
+</aside>
+
+<main>
+  <header>
+    <div class="breadcrumb">WORKSPACE <span>/</span> <strong id="crumb">COMMAND</strong></div>
+    <div class="header-right"><time id="clock"></time><span class="avatar">C</span></div>
+  </header>
+
+  <section class="page-heading">
+    <div>
+      <p class="eyebrow" id="eyebrow">Personal operations</p>
+      <h1 id="title">Command center<span>.</span></h1>
+      <p class="lead" id="subtitle">A clear view of what comes next.</p>
+    </div>
+    <button id="command-button" class="command-button">⌕ <span>Find an action</span> <kbd>Ctrl K</kbd></button>
+  </section>
+
+  <!-- Views are populated by JS; only one is shown at a time. -->
+  <div id="view-command"></div>
+  <div id="view-fitness" hidden></div>
+  <div id="view-food" hidden></div>
+  <div id="view-generic" hidden></div>
+</main>
+
+<!-- Capture dialog: add an entry to any list-based section -->
+<dialog id="entry-dialog">
+  <form id="entry-form" method="dialog">
+    <div class="dialog-top"><h2 id="entry-title">Add</h2><button type="button" class="close" data-close aria-label="Close">×</button></div>
+    <div id="entry-fields"></div>
+    <div class="dialog-actions">
+      <button type="button" class="btn" data-close>Cancel</button>
+      <button type="submit" class="primary">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Command palette -->
+<dialog id="search-dialog">
+  <div class="dialog-top"><h2>Find an action</h2><button type="button" class="close" data-close aria-label="Close">×</button></div>
+  <input id="search" type="text" placeholder="Search actions and sections…" autocomplete="off" />
+  <div id="search-results"></div>
+</dialog>
+
+<!-- Obsidian import -->
+<dialog id="obsidian-dialog">
+  <div class="dialog-top"><h2>Import from Obsidian</h2><button type="button" class="close" data-close aria-label="Close">×</button></div>
+  <p class="muted" style="font-size:13px;margin:10px 0 0">Paste daily notes. Reads weigh-ins, lifts and food. Nothing is saved until you press Import.</p>
+  <textarea id="obsidian-text" placeholder="--- \ndate: 2026-09-07\nweight: 184\n---\n## Training\nBench Press 185x8, 185x8\n## Food\nOats 350 cal, 12g protein"></textarea>
+  <div id="obsidian-preview"></div>
+  <div class="dialog-actions">
+    <button type="button" class="btn" id="obsidian-parse">Preview</button>
+    <button type="button" class="primary" id="obsidian-import" disabled>Import</button>
+  </div>
+</dialog>
+
+<div id="toast" hidden></div>
+
+<script>
+"use strict";
+// ============================================================================
+// STORAGE — everything persists to localStorage under "cd_" keys. Each getter
+// fails safe to a default so a cleared or private-mode browser never crashes.
+// ============================================================================
+const DB = {
+  get(key, fallback){ try{ const r = localStorage.getItem("cd_"+key); return r ? JSON.parse(r) : fallback; }catch(e){ return fallback; } },
+  set(key, val){ try{ localStorage.setItem("cd_"+key, JSON.stringify(val)); }catch(e){} },
+};
+const todayKey = (d=new Date())=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+const uid = ()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const esc = s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const $ = s=>document.querySelector(s);
+
+// ---- Targets (editable on the Food screen) ----
+const DEFAULT_TARGETS = { calories:2200, protein:200, carbs:220, fat:70 };
+const getTargets = ()=>({ ...DEFAULT_TARGETS, ...DB.get("targets", {}) });
+
+// ---- Nutrition helpers ----
+function foodTotals(list){
+  return (list||[]).reduce((a,f)=>({calories:a.calories+(+f.calories||0),protein:a.protein+(+f.protein||0),carbs:a.carbs+(+f.carbs||0),fat:a.fat+(+f.fat||0)}),{calories:0,protein:0,carbs:0,fat:0});
+}
+
+// ============================================================================
+// FITNESS DOMAIN — ported from the LiftCoach logic, plain functions.
+// ============================================================================
+const DISCIPLINES = [
+  {id:"bjj_gi",label:"BJJ (Gi)",impact:1.0},{id:"bjj_nogi",label:"BJJ (No-Gi)",impact:1.0},
+  {id:"muay_thai",label:"Muay Thai",impact:1.15},{id:"boxing",label:"Boxing",impact:1.1},
+  {id:"wrestling",label:"Wrestling",impact:1.25},{id:"mma",label:"MMA",impact:1.25},
+  {id:"conditioning",label:"Conditioning",impact:0.9},
+];
+const INTENSITIES = [
+  {id:"technical",label:"Technical",rpe:3,hint:"Drilling, flow, light"},
+  {id:"hard",label:"Hard",rpe:6,hint:"Live rounds, positional"},
+  {id:"sparring",label:"Sparring",rpe:9,hint:"Full rounds, competitive"},
+];
+const disc = id=>DISCIPLINES.find(d=>d.id===id);
+const inten = id=>INTENSITIES.find(i=>i.id===id);
+const discLabel = id=>disc(id)?.label ?? id;
+// Session load = minutes x session-RPE, scaled by how much the discipline
+// beats you up. Unitless; only meaningful against your own other sessions.
+function sessionLoad(s){ const i=inten(s.intensity); if(!i) return 0; return Math.round(s.minutes*i.rpe*(disc(s.discipline)?.impact??1)); }
+function withinDays(list, days, now=Date.now()){ const cut=now-days*864e5; return (list||[]).filter(s=>new Date(s.date).getTime()>=cut); }
+const totalLoad = list=>(list||[]).reduce((a,s)=>a+sessionLoad(s),0);
+function acuteChronic(list, now=Date.now()){
+  const acute=totalLoad(withinDays(list,7,now)); const chronic=withinDays(list,28,now);
+  if(chronic.length<4) return null; const wk=totalLoad(chronic)/4; if(!wk) return null; return acute/wk;
+}
+const hardWithin = (list,days,now=Date.now())=>withinDays(list,days,now).filter(s=>s.intensity==="hard"||s.intensity==="sparring").length;
+
+// ---- Weekly plan ----
+const DAY_LABELS = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+const SLOTS = [{id:"lift",label:"Lift"},{id:"mat",label:"Mat"},{id:"conditioning",label:"Conditioning"},{id:"rest",label:"Rest"}];
+const DEFAULT_PLAN = {Mon:["lift"],Tue:["mat"],Wed:["lift"],Thu:["mat"],Fri:["lift"],Sat:["mat","conditioning"],Sun:["rest"]};
+const dayIdx = d=>(d.getDay()+6)%7;
+const plannedToday = plan=>plan[DAY_LABELS[dayIdx(new Date())]] ?? [];
+function consecutiveTrainingDays(dateSet, today){
+  let n=0; const c=new Date(today+"T00:00:00");
+  for(let i=0;i<30;i++){ if(!dateSet.has(todayKey(c))) break; n++; c.setDate(c.getDate()-1); }
+  return n;
+}
+
+// ---- Weight: series -> EMA trend -> weekly rate ----
+//
+// Daily weight is noisy (water, food timing, salt), so a raw day-to-day
+// reading tells you almost nothing. The trend is an exponential moving
+// average, which is what makes "am I actually losing weight" answerable.
+const TREND_SMOOTHING = 0.1;
+function weightSeries(weighins){
+  return Object.keys(weighins||{}).sort().map(d=>({date:d, weight:+weighins[d]}));
+}
+function computeTrend(series){
+  let trend=null;
+  return series.map(pt=>{ trend = trend===null ? pt.weight : trend + TREND_SMOOTHING*(pt.weight-trend);
+    return {...pt, trend}; });
+}
+/** lbs/week change in the trend over the last ~2 weeks. Negative = losing. */
+function weeklyRate(trendSeries){
+  if(trendSeries.length<2) return null;
+  const last=trendSeries[trendSeries.length-1];
+  // Walk back to the oldest point within 14 days of the newest.
+  const cutoff=new Date(last.date+"T00:00:00").getTime()-14*864e5;
+  const window=trendSeries.filter(p=>new Date(p.date+"T00:00:00").getTime()>=cutoff);
+  if(window.length<2) return null;
+  const first=window[0];
+  const days=(new Date(last.date)-new Date(first.date))/864e5;
+  if(days<1) return null;
+  return (last.trend-first.trend)/days*7;
+}
+
+// ---- The coach: rules over food + lifts + mat + weight ----
+function runCoach(){
+  const out=[];
+  const day=todayKey();
+  const foodLog=DB.get("foodLog",{}); const totals=foodTotals(foodLog[day]); const t=getTargets();
+  const mma=DB.get("mma",[]); const lifts=DB.get("lifts",[]); const plan=DB.get("plan",DEFAULT_PLAN);
+  const weigh=DB.get("weighins",{});
+  const trendSeries=computeTrend(weightSeries(weigh));
+  const trendWeight=trendSeries.length?trendSeries[trendSeries.length-1].trend:null;
+  const rate=weeklyRate(trendSeries);
+  // Rate as a % of bodyweight, so "fast" scales to the person rather than
+  // being a fixed pounds number.
+  const pctWeek = (rate!=null&&trendWeight) ? Math.abs(rate)/trendWeight*100 : null;
+
+  // Plan for today
+  const pt=plannedToday(plan);
+  const trainedToday = mma.some(s=>todayKey(new Date(s.date))===day) || lifts.some(w=>todayKey(new Date(w.date))===day);
+  if(pt.length && !trainedToday){
+    if(pt.length===1&&pt[0]==="rest") out.push(["Today is a rest day on your plan — take it.","info"]);
+    else out.push([`Plan says ${pt.map(p=>p==="mat"?"mat work":p).join(" and ")} today.`,"info"]);
+  }
+  // Mat volume spike
+  const acwr=acuteChronic(mma);
+  if(acwr!==null && acwr>1.5) out.push(["Mat volume is up sharply on your recent average — ease off before something tweaks.","warn"]);
+  // Too many hard rounds
+  const hard=hardWithin(mma,7);
+  if(hard>3) out.push([`${hard} hard sessions this week — make the next one technical.`,"warn"]);
+  // No rest day across a run
+  const trainedDays=new Set([...mma.map(s=>todayKey(new Date(s.date))),...lifts.map(w=>todayKey(new Date(w.date)))]);
+  const streak=consecutiveTrainingDays(trainedDays,day);
+  if(streak>6) out.push([`${streak} days straight without a rest day — take one.`,"warn"]);
+  // Protein behind, later in the day
+  if(new Date().getHours()>=18 && totals.protein < t.protein-10) out.push([`Behind on protein — ${Math.round(t.protein-totals.protein)}g to go.`,"warn"]);
+  // Fuel a mat day
+  const matMin=mma.filter(s=>todayKey(new Date(s.date))===day).reduce((a,s)=>a+(+s.minutes||0),0);
+  if(matMin>=45 && totals.protein < t.protein-10) out.push([`${matMin} min on the mat today — still ${Math.round(t.protein-totals.protein)}g of protein to go.`,"warn"]);
+  // ---- Weight ----
+  // Cutting hard WHILE taking contact is the cross-reference a food app or a
+  // gym app can't make on its own, so it outranks the plain "cutting fast".
+  const hardWeek=hardWithin(mma,7);
+  if(pctWeek!=null && rate<0 && pctWeek>0.8 && hardWeek>=2){
+    out.push([`You're cutting fast with ${hardWeek} hard sessions this week — eat more or spar less.`,"warn"]);
+  } else if(pctWeek!=null && rate<0 && pctWeek>1){
+    out.push([`Cutting fast at ${Math.abs(rate).toFixed(1)} lbs/wk — watch for strength loss.`,"warn"]);
+  } else if(pctWeek!=null && rate<0 && pctWeek>=0.3){
+    out.push([`Good pace — trending down about ${Math.abs(rate).toFixed(1)} lbs/wk.`,"good"]);
+  }
+  if(Object.keys(weigh).length && weigh[day]===undefined){
+    out.push(["No weigh-in today — log it to keep your trend honest.","info"]);
+  }
+  // Nothing logged
+  if(!mma.length && !lifts.length) out.push(["No training logged yet — log your first session.","info"]);
+  if(out.length===0) out.push(["Nothing stands out. Keep it up.","good"]);
+  return out;
+}
+
+// ============================================================================
+// OBSIDIAN PARSER — best-guess over common note conventions, built to be
+// corrected. See the LiftCoach obsidian.js for the fuller version.
+// ============================================================================
+const OB = (()=>{
+  const ISO=/(\d{4}-\d{2}-\d{2})/;
+  function frontmatter(text){
+    const m=text.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/); const f={};
+    if(m){ m[1].split(/\r?\n/).forEach(l=>{ const p=l.match(/^\s*([\w -]+)\s*:\s*(.*)$/); if(p) f[p[1].trim().toLowerCase()]=p[2].trim(); }); return {f, body:text.slice(m[0].length)}; }
+    return {f, body:text};
+  }
+  function inline(text){ const f={}; const re=/\[?\s*([A-Za-z][\w -]*?)\s*::\s*([^\]\n]+?)\s*\]?\s*$/gm; let m; while((m=re.exec(text))){ f[m[1].trim().toLowerCase()]=m[2].trim(); } return f; }
+  const num=v=>{ const m=String(v??"").match(/-?\d+(?:\.\d+)?/); return m?parseFloat(m[0]):null; };
+  function weightFrom(f){ for(const k of ["weight","bodyweight","bw"]){ if(f[k]!=null){ const v=num(f[k]); if(v>0) return v; } } return null; }
+  function parseLift(line){
+    const c=line.replace(/^\s*(?:[-*+]\s*)?(?:\[[ xX]\]\s*)?/,"").trim(); if(!c) return null;
+    const sp=c.match(/^([A-Za-z][A-Za-z0-9 '().\-\/]*?)\s*[:\-—]?\s*(\d.*)$/); if(!sp) return null;
+    const name=sp[1].trim().replace(/[:\-—]+$/,"").trim(); if(name.length<2) return null; const rest=sp[2];
+    const at=rest.match(/^(\d+)\s*[x×]\s*(\d+)\s*@\s*(\d+(?:\.\d+)?)/i);
+    if(at){ const n=+at[1]; if(n>0&&n<=20) return {name,sets:Array.from({length:n},()=>({weight:+at[3],reps:+at[2]}))}; }
+    const sets=[]; const re=/(\d+(?:\.\d+)?)\s*[x×]\s*(\d+)/gi; let m; while((m=re.exec(rest))) sets.push({weight:+m[1],reps:+m[2]});
+    return sets.length?{name,sets}:null;
+  }
+  const P={calories:/(\d+(?:\.\d+)?)\s*(?:kcal|cal(?:ories)?)\b/i,protein:/(\d+(?:\.\d+)?)\s*g?\s*(?:p\b|protein)/i,carbs:/(\d+(?:\.\d+)?)\s*g?\s*(?:c\b|carbs?)/i,fat:/(\d+(?:\.\d+)?)\s*g?\s*(?:f\b|fat)/i};
+  function parseFood(line){
+    const c=line.replace(/^\s*(?:[-*+]\s*)?/,"").trim(); const cal=c.match(P.calories); if(!cal) return null;
+    const i=c.search(/\d/); let name=c.slice(0,i).replace(/[—–\-:,|]+\s*$/,"").trim()||"Food";
+    const r=k=>{ const m=c.match(P[k]); return m?parseFloat(m[1]):0; };
+    return {name,calories:+cal[1],protein:r("protein"),carbs:r("carbs"),fat:r("fat")};
+  }
+  const TRAIN=/^#{1,6}\s*(training|workout|lifts?|gym|session|strength)\b/i;
+  const FOODH=/^#{1,6}\s*(food|meals?|nutrition|diet|eating)\b/i;
+  const HEAD=/^#{1,6}\s+/; const DATEH=/^#{1,6}\s+.*?(\d{4}-\d{2}-\d{2})/;
+  function parseNote(text, fallback){
+    const {f:fm,body}=frontmatter(text); const f={...fm,...inline(body)};
+    const dh=body.match(DATEH);
+    const date=(fm.date&&fm.date.match(ISO)?.[1]) || (dh?dh[1]:null) || fallback;
+    const weight=weightFrom(f); const lifts=[]; const foods=[]; let sec="?";
+    for(const raw of body.split(/\r?\n/)){ const line=raw.trim(); if(!line) continue;
+      if(TRAIN.test(line)){sec="t";continue} if(FOODH.test(line)){sec="f";continue} if(HEAD.test(line)){sec="?";continue}
+      if(line.includes("::")) continue;
+      if(sec==="t"){ const l=parseLift(line); if(l) lifts.push(l); continue; }
+      if(sec==="f"){ const fo=parseFood(line); if(fo) foods.push(fo); continue; }
+      const fo=parseFood(line); if(fo){foods.push(fo);continue} const l=parseLift(line); if(l) lifts.push(l);
+    }
+    return {date,weight,lifts,foods};
+  }
+  function parseVault(text){
+    const lines=(text||"").split(/\r?\n/); const chunks=[]; let cur=[];
+    for(const line of lines){ if(DATEH.test(line)&&cur.some(l=>l.trim())){chunks.push(cur.join("\n"));cur=[line]} else cur.push(line); }
+    if(cur.length) chunks.push(cur.join("\n"));
+    const days=[];
+    for(const ch of chunks){ const p=parseNote(ch,null); if(!p.date) continue; if(!p.weight&&!p.lifts.length&&!p.foods.length) continue; days.push(p); }
+    days.sort((a,b)=>a.date.localeCompare(b.date)); return days;
+  }
+  return {parseVault};
+})();
+
+// ============================================================================
+// NAV + VIEW ROUTING
+// ============================================================================
+const MODULES = [
+  {id:"Command", ic:"◈"},{id:"Fitness", ic:"⌁"},{id:"Food", ic:"◉"},{id:"Planner", ic:"☷"},
+  {id:"Calendar", ic:"▦"},{id:"Journal", ic:"▤"},{id:"Reselling", ic:"⬡"},{id:"Money", ic:"$"},
+];
+// Quick actions. New Quote (Quotes) and Review QR (Reviews) were removed at
+// the owner's request, along with the CD Lawn Care branding.
+const ACTIONS = [
+  {label:"Add Food", module:"Food", icon:"◉", tag:"Nutrition"},
+  {label:"Scan Food", module:"Food", icon:"⌗", tag:"Capture"},
+  {label:"Log Lift", module:"Fitness", icon:"▤", tag:"Training"},
+  {label:"Log Mat Work", module:"Fitness", icon:"◎", tag:"Training"},
+  {label:"Log Weight", module:"Fitness", icon:"◑", tag:"Body"},
+  {label:"Add Event", module:"Calendar", icon:"▦", tag:"Schedule"},
+  {label:"Journal", module:"Journal", icon:"✎", tag:"Reflection"},
+  {label:"Log Sale", module:"Reselling", icon:"⬡", tag:"Business"},
+  {label:"Add Expense", module:"Money", icon:"$", tag:"Finances"},
+  {label:"Add Task", module:"Planner", icon:"＋", tag:"Planning"},
+];
+// List-based sections use a shared entry store keyed by module.
+const GENERIC = {
+  Planner:  {store:"tasks",    noun:"Task",    fields:[["title","Task",1],["notes","Notes",0]]},
+  Calendar: {store:"events",   noun:"Event",   fields:[["title","Event",1],["when","When",0],["notes","Notes",0]]},
+  Journal:  {store:"journal",  noun:"Entry",   fields:[["title","Title",1],["notes","Entry",0]]},
+  Reselling:{store:"sales",    noun:"Sale",    fields:[["title","Item",1],["amount","Amount ($)",0],["notes","Notes",0]]},
+  Money:    {store:"expenses", noun:"Expense", fields:[["title","What",1],["amount","Amount ($)",0],["notes","Notes",0]]},
+};
+let current = "Command";
+
+const nav = $("#navigation");
+MODULES.forEach(m=>{ const b=document.createElement("button"); b.dataset.module=m.id; b.innerHTML=`<span class="ic">${m.ic}</span>${m.id}`; b.onclick=()=>show(m.id); nav.append(b); });
+
+function show(name){
+  current = name;
+  document.querySelectorAll("nav button").forEach(b=>{ const on=b.dataset.module===name; b.classList.toggle("active",on); if(on) b.setAttribute("aria-current","page"); else b.removeAttribute("aria-current"); });
+  $("#crumb").textContent = name.toUpperCase();
+  $("#view-command").hidden = name!=="Command";
+  $("#view-fitness").hidden = name!=="Fitness";
+  $("#view-food").hidden = name!=="Food";
+  $("#view-generic").hidden = !GENERIC[name];
+  const heads = {
+    Command:["Personal operations","Command center.","A clear view of what comes next."],
+    Fitness:["Training","Fitness.","Lifts, mat work, and the week's plan."],
+    Food:["Nutrition","Food.","Today against your targets."],
+    Planner:["Planning","Planner.","What needs doing."],
+    Calendar:["Schedule","Calendar.","What's coming up."],
+    Journal:["Reflection","Journal.","Notes to yourself."],
+    Reselling:["Business","Reselling.","Sales logged."],
+    Money:["Finances","Money.","What's going out."],
+  }[name];
+  $("#eyebrow").textContent = heads[0]; $("#title").innerHTML = esc(heads[1]).replace(/\.$/,'<span>.</span>'); $("#subtitle").textContent = heads[2];
+  if(name==="Command") renderCommand();
+  else if(name==="Fitness") renderFitness();
+  else if(name==="Food") renderFood();
+  else renderGeneric(name);
+}
+
+// ---- Ring SVG ----
+function ring(value, target, label, unit){
+  const pct = target>0 ? Math.min(1, value/target) : 0;
+  const r=52, c=2*Math.PI*r, off=c*(1-pct);
+  return `<div class="ring"><svg width="118" height="118" viewBox="0 0 118 118">
+    <circle cx="59" cy="59" r="${r}" fill="none" stroke="#2a1a1b" stroke-width="7"/>
+    <circle cx="59" cy="59" r="${r}" fill="none" stroke="var(--accent)" stroke-width="7" stroke-linecap="round"
+      stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}"/>
+  </svg><div class="val"><b>${Math.round(value)}</b><small>${label}<br/>/${target}${unit||""}</small></div></div>`;
+}
+
+/** Small inline trend line. Returns "" when there is not enough to plot. */
+function sparkline(trendSeries){
+  const pts=trendSeries.slice(-30); if(pts.length<3) return "";
+  const vals=pts.map(p=>p.trend); const min=Math.min(...vals), max=Math.max(...vals);
+  const span=(max-min)||1, W=280, H=52;
+  const d=pts.map((p,i)=>`${i?"L":"M"}${(i/(pts.length-1)*W).toFixed(1)},${(H-((p.trend-min)/span)*H).toFixed(1)}`).join(" ");
+  return `<svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="margin-top:12px;overflow:visible">
+    <path d="${d}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
+}
+
+// ============================================================================
+// VIEWS
+// ============================================================================
+function renderCommand(){
+  const day=todayKey(); const foodLog=DB.get("foodLog",{}); const totals=foodTotals(foodLog[day]); const t=getTargets();
+  const proteinLeft=Math.max(0,Math.round(t.protein-totals.protein));
+  const coach=runCoach();
+  const tasks=DB.get("tasks",[]).filter(e=>!e.done).slice(0,4);
+
+  $("#view-command").innerHTML = `
+    <div class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">${esc(new Date().toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"}).toUpperCase())}</p>
+        <h2>Good ${greeting()}, <span>Chaston</span>.</h2>
+        <p>${esc(coach[0][0])}</p>
+      </div>
+      <div class="reactor" aria-hidden="true">
+        <div class="orbit o1"></div><div class="orbit o2"></div><div class="orbit o3"></div>
+        <div class="core"><b>${proteinLeft}</b><small>G PROTEIN</small></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="section-title"><h2>Quick actions</h2><span class="tag">TAP TO LOG</span></div>
+      <div class="actions" id="actions"></div>
+    </div>
+
+    <div class="grid cols-2">
+      <div class="panel">
+        <div class="section-title"><h2>Coach</h2><span class="tag">SIGNALS</span></div>
+        ${coach.map(c=>`<p class="coach-line coach-${c[1]}">${esc(c[0])}</p>`).join("")}
+      </div>
+      <div class="panel">
+        <div class="section-title"><h2>Daily vitals</h2><button class="ghost" onclick="show('Food')">Open →</button></div>
+        <div class="rings">
+          ${ring(totals.calories,t.calories,"KCAL","")}
+          ${ring(totals.protein,t.protein,"PROTEIN","g")}
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="section-title"><h2>Up next</h2><button class="ghost" onclick="show('Planner')">Planner →</button></div>
+      ${tasks.length ? tasks.map(e=>`<div class="entry"><div class="body"><strong>${esc(e.title)}</strong>${e.notes?`<p>${esc(e.notes)}</p>`:""}</div></div>`).join("") : `<p class="empty">No open tasks. Add one from Planner.</p>`}
+    </div>`;
+
+  const box=$("#actions");
+  ACTIONS.forEach(a=>{ const b=document.createElement("button"); b.className="action";
+    b.innerHTML=`<span class="icon">${a.icon}</span><span><strong>${esc(a.label)}</strong><small>${esc(a.tag)}</small></span><span class="arrow">↗</span>`;
+    b.onclick=()=>runAction(a); box.append(b); });
+}
+const greeting=()=>{ const h=new Date().getHours(); return h<12?"morning":h<17?"afternoon":"evening"; };
+
+function runAction(a){
+  if(a.label==="Add Food"||a.label==="Scan Food"){ show("Food"); openFood(a.label==="Scan Food"); return; }
+  if(a.label==="Log Lift"){ show("Fitness"); openLift(); return; }
+  if(a.label==="Log Mat Work"){ show("Fitness"); openMat(); return; }
+  if(a.label==="Log Weight"){ show("Fitness"); openWeight(); return; }
+  const g=GENERIC[a.module]; if(g){ show(a.module); openEntry(a.module); }
+}
+
+// ---- FITNESS ----
+function renderFitness(){
+  const mma=DB.get("mma",[]); const lifts=DB.get("lifts",[]); const plan=DB.get("plan",DEFAULT_PLAN);
+  const week=withinDays(mma,7); const weekMin=week.reduce((a,s)=>a+(+s.minutes||0),0);
+  const weigh=DB.get("weighins",{}); const wCount=Object.keys(weigh).length;
+  const trendSeries=computeTrend(weightSeries(weigh));
+  const trendWeight=trendSeries.length?trendSeries[trendSeries.length-1].trend:null;
+  const rate=weeklyRate(trendSeries);
+  const spark=sparkline(trendSeries);
+
+  $("#view-fitness").innerHTML = `
+    <div class="grid cols-2">
+      <div class="panel">
+        <div class="section-title"><h2>Log training</h2><span class="tag">~3 TAPS</span></div>
+        <div class="row" style="gap:10px;flex-wrap:wrap">
+          <button class="primary" id="f-mat">Log mat work</button>
+          <button class="btn" id="f-lift">Log a lift</button>
+          <button class="btn" id="f-obsidian">Import Obsidian</button>
+        </div>
+        <div class="section-title" style="margin-top:22px"><h2>This week</h2></div>
+        <p class="big">${weekMin} min <span class="muted" style="font-size:15px">· ${week.length} session${week.length===1?"":"s"}</span></p>
+        <p class="muted" style="margin:2px 0 0">${hardWithin(mma,7)} hard · training load ${totalLoad(week)}</p>
+      </div>
+      <div class="panel">
+        <div class="section-title"><h2>Coach</h2><span class="tag">SIGNALS</span></div>
+        ${runCoach().map(c=>`<p class="coach-line coach-${c[1]}">${esc(c[0])}</p>`).join("")}
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="section-title"><h2>Weekly plan</h2><span class="tag">TAP TO SET · REPEATS</span></div>
+      <div id="plangrid"></div>
+    </div>
+
+    <div class="panel">
+      <div class="section-title"><h2>Weight</h2><button class="btn" id="f-weight">Log weight</button></div>
+      ${trendWeight!=null ? `
+        <p class="big">${trendWeight.toFixed(1)} <span class="muted" style="font-size:15px">lbs trend</span></p>
+        ${rate!=null ? `<p class="muted" style="margin:2px 0 0">${Math.abs(rate).toFixed(1)} lbs/week ${rate<0?"loss":"gain"} · ${wCount} weigh-in${wCount===1?"":"s"} logged</p>` : `<p class="muted" style="margin:2px 0 0">${wCount} weigh-in${wCount===1?"":"s"} — a few more days and a trend appears.</p>`}
+        ${spark}
+      ` : `<p class="empty">No weigh-ins yet. Log one, or import from Obsidian.</p>`}
+    </div>
+
+    <div class="panel">
+      <div class="section-title"><h2>Recent mat work</h2></div>
+      <div id="mat-list">${mma.length ? mma.slice(0,8).map(s=>`
+        <div class="entry"><div class="body"><strong>${esc(discLabel(s.discipline))} · ${s.minutes} min · ${esc(inten(s.intensity)?.label||s.intensity)}</strong>
+        <small>${esc(new Date(s.date).toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"}))}</small>
+        ${s.notes?`<p>${esc(s.notes)}</p>`:""}</div><span class="accent" style="font-weight:600">${sessionLoad(s)}</span></div>`).join("") : `<p class="empty">No mat sessions yet.</p>`}</div>
+    </div>
+
+    <div class="panel">
+      <div class="section-title"><h2>Recent lifts</h2></div>
+      <div>${lifts.length ? lifts.slice(0,8).map(w=>`
+        <div class="entry"><div class="body"><strong>${esc((w.exercises||[]).map(e=>e.name).join(", ")||"Workout")}</strong>
+        <small>${esc(new Date(w.date).toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"}))}</small></div></div>`).join("") : `<p class="empty">No lifts yet.</p>`}</div>
+    </div>`;
+
+  // Plan grid
+  const pg=$("#plangrid");
+  DAY_LABELS.forEach(dl=>{
+    const row=document.createElement("div"); row.style.cssText="padding:10px 0;border-top:1px solid var(--line)";
+    const trained = (dl===DAY_LABELS[dayIdx(new Date())]);
+    row.innerHTML=`<div class="row" style="justify-content:space-between"><strong>${dl}${trained?' <span class="tag">TODAY</span>':""}</strong></div><div class="chip-row" style="margin-top:6px"></div>`;
+    const cr=row.querySelector(".chip-row");
+    SLOTS.forEach(sl=>{ const on=(plan[dl]||[]).includes(sl.id); const c=document.createElement("button");
+      c.className="chip"+(on?" on":""); c.textContent=sl.label;
+      c.onclick=()=>{ const p=DB.get("plan",DEFAULT_PLAN); let cur=p[dl]||[];
+        if(cur.includes(sl.id)) cur=cur.filter(x=>x!==sl.id);
+        else if(sl.id==="rest") cur=["rest"]; else cur=[...cur.filter(x=>x!=="rest"),sl.id];
+        p[dl]=cur; DB.set("plan",p); renderFitness(); };
+      cr.append(c); });
+    pg.append(row);
+  });
+
+  $("#f-mat").onclick=openMat; $("#f-lift").onclick=openLift; $("#f-obsidian").onclick=openObsidian;
+  $("#f-weight").onclick=openWeight;
+}
+
+// ---- FOOD ----
+function renderFood(){
+  const day=todayKey(); const log=DB.get("foodLog",{}); const foods=log[day]||[]; const totals=foodTotals(foods); const t=getTargets();
+  const MAC=[["calories","Calories",""],["protein","Protein","g"],["carbs","Carbs","g"],["fat","Fat","g"]];
+  $("#view-food").innerHTML = `
+    <div class="grid cols-2">
+      <div class="panel">
+        <div class="section-title"><h2>Today</h2><button class="primary" id="food-add">Add food</button></div>
+        ${MAC.map(m=>{ const v=Math.round(totals[m[0]]); const tg=t[m[0]]; const left=Math.round(tg-totals[m[0]]);
+          return `<div class="list-metric"><span class="k">${m[1]}</span><span>${v} / ${tg}${m[2]} <span class="${left<0?'':'muted'}" style="${left<0?'color:var(--warn)':''}">· ${left<0?Math.abs(left)+m[2]+" over":left+m[2]+" left"}</span></span></div>`; }).join("")}
+        <div class="row" style="margin-top:14px;gap:10px">
+          <button class="btn" id="food-obsidian">Import Obsidian</button>
+          <button class="ghost" id="food-targets">Edit targets</button>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="section-title"><h2>Rings</h2></div>
+        <div class="rings">${ring(totals.calories,t.calories,"KCAL","")}${ring(totals.protein,t.protein,"PROTEIN","g")}</div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="section-title"><h2>Logged today</h2></div>
+      <div>${foods.length ? foods.map((f,i)=>`<div class="entry"><div class="body"><strong>${esc(f.name)}</strong>
+        <small>${Math.round(f.calories)} cal · ${Math.round(f.protein)}p ${Math.round(f.carbs)}c ${Math.round(f.fat)}f</small></div>
+        <button class="del" data-food="${i}" aria-label="Remove">×</button></div>`).join("") : `<p class="empty">Nothing logged today.</p>`}</div>
+    </div>`;
+  $("#food-add").onclick=()=>openFood(false);
+  $("#food-obsidian").onclick=openObsidian;
+  $("#food-targets").onclick=openTargets;
+  $("#view-food").querySelectorAll("[data-food]").forEach(b=>b.onclick=()=>{ const log=DB.get("foodLog",{}); const day=todayKey(); (log[day]||[]).splice(+b.dataset.food,1); DB.set("foodLog",log); renderFood(); if(current==="Command")renderCommand(); });
+}
+
+// ---- GENERIC list sections ----
+function renderGeneric(name){
+  const g=GENERIC[name]; const list=DB.get(g.store,[]);
+  const isMoney=(name==="Money"||name==="Reselling");
+  const sum=isMoney?list.reduce((a,e)=>a+(+e.amount||0),0):0;
+  $("#view-generic").innerHTML = `
+    <div class="panel">
+      <div class="section-title"><h2>${esc(name)}</h2><button class="primary" id="gen-add">Add ${esc(g.noun.toLowerCase())}</button></div>
+      ${isMoney?`<p class="big">$${sum.toLocaleString()}</p><p class="muted" style="margin:0 0 10px">${list.length} ${g.noun.toLowerCase()}${list.length===1?"":"s"} logged</p>`:""}
+      <div>${list.length ? list.map(e=>`<div class="entry">
+        ${name==="Planner"?`<button class="chip${e.done?' on':''}" style="width:26px;padding:4px 0;text-align:center" data-toggle="${e.id}">${e.done?"✓":""}</button>`:""}
+        <div class="body"><strong style="${e.done?'text-decoration:line-through;color:var(--muted)':''}">${esc(e.title)}${e.amount?` · $${esc(e.amount)}`:""}${e.when?` <span class="muted">· ${esc(e.when)}</span>`:""}</strong>
+        ${e.notes?`<p>${esc(e.notes)}</p>`:""}</div>
+        <button class="del" data-del="${e.id}" aria-label="Delete">×</button></div>`).join("") : `<p class="empty">Nothing here yet.</p>`}</div>
+    </div>`;
+  $("#gen-add").onclick=()=>openEntry(name);
+  $("#view-generic").querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{ DB.set(g.store, DB.get(g.store,[]).filter(e=>e.id!==b.dataset.del)); renderGeneric(name); });
+  $("#view-generic").querySelectorAll("[data-toggle]").forEach(b=>b.onclick=()=>{ const l=DB.get(g.store,[]); const e=l.find(x=>x.id===b.dataset.toggle); if(e){e.done=!e.done; DB.set(g.store,l);} renderGeneric(name); if(current!=="Planner")return; });
+}
+
+// ============================================================================
+// DIALOGS
+// ============================================================================
+function openDialog(d){ d.showModal(); }
+document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>b.closest("dialog").close());
+
+// Generic entry
+function openEntry(module){
+  const g=GENERIC[module]; if(!g) return;
+  $("#entry-title").textContent = "Add "+g.noun.toLowerCase();
+  $("#entry-fields").innerHTML = g.fields.map(f=>`<label>${esc(f[1])}${f[2]?"":' <span class="faint">(optional)</span>'}</label>${f[0]==="notes"?`<textarea id="ef-${f[0]}"></textarea>`:`<input id="ef-${f[0]}" ${f[1].includes("Amount")?'inputmode="decimal"':""}/>`}`).join("");
+  const form=$("#entry-form");
+  form.onsubmit=e=>{ e.preventDefault(); const rec={id:uid()}; let ok=false;
+    g.fields.forEach(f=>{ const v=$("#ef-"+f[0]).value.trim(); rec[f[0]]=v; if(f[0]==="title"&&v) ok=true; });
+    if(!ok) return; if(module==="Planner") rec.done=false;
+    const l=DB.get(g.store,[]); l.unshift(rec); DB.set(g.store,l);
+    $("#entry-dialog").close(); toast(g.noun+" added"); renderGeneric(module); };
+  openDialog($("#entry-dialog")); setTimeout(()=>$("#ef-title")?.focus(),40);
+}
+
+// Food capture
+function openFood(scan){
+  $("#entry-title").textContent = scan?"Scan food":"Add food";
+  $("#entry-fields").innerHTML =
+    (scan?`<p class="muted" style="font-size:13px;margin:6px 0 0">Barcode scanning isn't wired up in this build — enter it manually and it logs the same way.</p>`:"")+
+    `<label>Food</label><input id="ff-name"/>
+     <label>Calories</label><input id="ff-cal" inputmode="numeric"/>
+     <div class="row" style="gap:10px"><div style="flex:1"><label>Protein (g)</label><input id="ff-p" inputmode="numeric"/></div>
+     <div style="flex:1"><label>Carbs (g)</label><input id="ff-c" inputmode="numeric"/></div>
+     <div style="flex:1"><label>Fat (g)</label><input id="ff-f" inputmode="numeric"/></div></div>`;
+  $("#entry-form").onsubmit=e=>{ e.preventDefault(); const name=$("#ff-name").value.trim(); const cal=parseFloat($("#ff-cal").value); if(!name||isNaN(cal))return;
+    const log=DB.get("foodLog",{}); const day=todayKey(); (log[day]=log[day]||[]).unshift({name,calories:cal,protein:+$("#ff-p").value||0,carbs:+$("#ff-c").value||0,fat:+$("#ff-f").value||0});
+    DB.set("foodLog",log); $("#entry-dialog").close(); toast("Food logged"); renderFood(); };
+  openDialog($("#entry-dialog")); setTimeout(()=>$("#ff-name").focus(),40);
+}
+
+// Mat work capture
+function openMat(){
+  let d0=DISCIPLINES[0].id, i0="hard", min=60;
+  $("#entry-title").textContent="Log mat work";
+  $("#entry-fields").innerHTML=`
+    <label>Discipline</label><div class="chip-row" id="mm-disc"></div>
+    <label>Intensity</label><div class="chip-row" id="mm-int"></div>
+    <label>Minutes</label><div class="chip-row" id="mm-min"></div>
+    <label>Notes <span class="faint">(optional)</span></label><textarea id="mm-notes"></textarea>`;
+  const chips=(host,items,sel,onPick)=>{ const h=$(host); h.innerHTML=""; items.forEach(it=>{ const c=document.createElement("button"); c.type="button"; c.className="chip"+(it.id===sel()?" on":""); c.textContent=it.label;
+    c.onclick=()=>{ onPick(it.id); [...h.children].forEach(x=>x.classList.remove("on")); c.classList.add("on"); }; h.append(c); }); };
+  chips("#mm-disc",DISCIPLINES,()=>d0,v=>d0=v);
+  chips("#mm-int",INTENSITIES,()=>i0,v=>i0=v);
+  chips("#mm-min",[30,45,60,90,120].map(m=>({id:m,label:m+" min"})),()=>min,v=>min=v);
+  $("#entry-form").onsubmit=e=>{ e.preventDefault(); const l=DB.get("mma",[]); l.unshift({id:uid(),date:new Date().toISOString(),discipline:d0,intensity:i0,minutes:min,notes:$("#mm-notes").value.trim()}); DB.set("mma",l); $("#entry-dialog").close(); toast("Mat session logged"); renderFitness(); };
+  openDialog($("#entry-dialog"));
+}
+
+// Lift capture (lightweight: name + sets as text)
+function openLift(){
+  $("#entry-title").textContent="Log a lift";
+  $("#entry-fields").innerHTML=`<label>Exercise</label><input id="lf-name" placeholder="Bench Press"/>
+    <label>Sets <span class="faint">(e.g. 185x8, 185x8, 180x7)</span></label><input id="lf-sets" placeholder="185x8, 185x8"/>`;
+  $("#entry-form").onsubmit=e=>{ e.preventDefault(); const name=$("#lf-name").value.trim(); if(!name)return;
+    const sets=[...$("#lf-sets").value.matchAll(/(\d+(?:\.\d+)?)\s*[x×]\s*(\d+)/gi)].map(m=>({weight:+m[1],reps:+m[2]}));
+    const l=DB.get("lifts",[]); l.unshift({id:uid(),date:new Date().toISOString(),exercises:[{name,sets}]}); DB.set("lifts",l);
+    $("#entry-dialog").close(); toast("Lift logged"); renderFitness(); };
+  openDialog($("#entry-dialog")); setTimeout(()=>$("#lf-name").focus(),40);
+}
+
+// Weight capture — one number, so it saves straight from the dialog. One
+// entry per day: logging again corrects the day rather than adding a second.
+function openWeight(){
+  const weigh=DB.get("weighins",{}); const day=todayKey();
+  $("#entry-title").textContent="Log weight";
+  $("#entry-fields").innerHTML=`<label>Weight (lbs)</label>
+    <input id="wt-val" inputmode="decimal" value="${weigh[day]!=null?weigh[day]:""}" placeholder="184.2"/>
+    <p class="muted" style="font-size:13px;margin:8px 0 0">One entry per day — saving again updates today.</p>`;
+  $("#entry-form").onsubmit=e=>{ e.preventDefault(); const v=parseFloat($("#wt-val").value); if(isNaN(v)||v<=0) return;
+    const w=DB.get("weighins",{}); w[todayKey()]=v; DB.set("weighins",w);
+    $("#entry-dialog").close(); toast("Weight logged"); renderFitness(); };
+  openDialog($("#entry-dialog")); setTimeout(()=>$("#wt-val").focus(),40);
+}
+
+// Targets
+function openTargets(){
+  const t=getTargets();
+  $("#entry-title").textContent="Daily targets";
+  $("#entry-fields").innerHTML=`<div class="row" style="gap:10px">
+    <div style="flex:1"><label>Calories</label><input id="tg-calories" value="${t.calories}" inputmode="numeric"/></div>
+    <div style="flex:1"><label>Protein</label><input id="tg-protein" value="${t.protein}" inputmode="numeric"/></div></div>
+    <div class="row" style="gap:10px"><div style="flex:1"><label>Carbs</label><input id="tg-carbs" value="${t.carbs}" inputmode="numeric"/></div>
+    <div style="flex:1"><label>Fat</label><input id="tg-fat" value="${t.fat}" inputmode="numeric"/></div></div>`;
+  $("#entry-form").onsubmit=e=>{ e.preventDefault(); DB.set("targets",{calories:+$("#tg-calories").value||DEFAULT_TARGETS.calories,protein:+$("#tg-protein").value||DEFAULT_TARGETS.protein,carbs:+$("#tg-carbs").value||DEFAULT_TARGETS.carbs,fat:+$("#tg-fat").value||DEFAULT_TARGETS.fat}); $("#entry-dialog").close(); toast("Targets updated"); renderFood(); };
+  openDialog($("#entry-dialog"));
+}
+
+// Obsidian import
+let obsidianDays=[];
+function openObsidian(){ $("#obsidian-text").value=""; $("#obsidian-preview").innerHTML=""; $("#obsidian-import").disabled=true; obsidianDays=[]; openDialog($("#obsidian-dialog")); }
+$("#obsidian-parse").onclick=()=>{
+  obsidianDays=OB.parseVault($("#obsidian-text").value);
+  const box=$("#obsidian-preview");
+  if(!obsidianDays.length){ box.innerHTML=`<p class="empty">Nothing recognised. Check the format hint above.</p>`; $("#obsidian-import").disabled=true; return; }
+  const w=obsidianDays.filter(d=>d.weight!=null).length, wo=obsidianDays.filter(d=>d.lifts.length).length, fo=obsidianDays.reduce((a,d)=>a+d.foods.length,0);
+  box.innerHTML=`<p class="tag" style="margin:14px 0 6px">FOUND</p><p class="muted" style="font-size:13px">${obsidianDays.length} day(s) · ${w} weigh-in(s) · ${wo} workout(s) · ${fo} food entr${fo===1?"y":"ies"}</p>`
+    + obsidianDays.map(d=>`<div class="entry"><div class="body"><strong>${esc(d.date)}</strong><small>${d.weight!=null?"weight "+d.weight+" · ":""}${d.lifts.length} lifts · ${d.foods.length} foods</small></div></div>`).join("");
+  $("#obsidian-import").disabled=false;
+};
+$("#obsidian-import").onclick=()=>{
+  const foodLog=DB.get("foodLog",{}), weigh=DB.get("weighins",{}), lifts=DB.get("lifts",[]);
+  const liftDates=new Set(lifts.map(w=>todayKey(new Date(w.date))));
+  let nf=0,nw=0,nl=0;
+  obsidianDays.forEach(d=>{
+    if(d.weight!=null && weigh[d.date]==null){ weigh[d.date]=d.weight; nw++; }
+    if(d.lifts.length && !liftDates.has(d.date)){ lifts.unshift({id:"ob-"+d.date,date:new Date(d.date+"T12:00:00").toISOString(),exercises:d.lifts}); nl++; }
+    if(d.foods.length){ (foodLog[d.date]=foodLog[d.date]||[]).push(...d.foods); nf+=d.foods.length; }
+  });
+  lifts.sort((a,b)=>new Date(b.date)-new Date(a.date));
+  DB.set("foodLog",foodLog); DB.set("weighins",weigh); DB.set("lifts",lifts);
+  $("#obsidian-dialog").close(); toast(`Imported ${nw} weigh-ins, ${nl} workouts, ${nf} foods`);
+  show(current);
+};
+
+// Command palette
+function paletteResults(){
+  const q=$("#search").value.toLowerCase(); const box=$("#search-results"); box.innerHTML="";
+  const items=[...ACTIONS.map(a=>({label:a.label,tag:a.tag,run:()=>{$("#search-dialog").close();runAction(a);}})),
+    ...MODULES.map(m=>({label:"Go to "+m.id,tag:"Section",run:()=>{$("#search-dialog").close();show(m.id);}}))];
+  const hits=items.filter(i=>(i.label+" "+i.tag).toLowerCase().includes(q));
+  if(!hits.length){ box.innerHTML=`<p class="empty">No matches.</p>`; return; }
+  hits.forEach(i=>{ const b=document.createElement("button"); b.className="action"; b.innerHTML=`<span><strong>${esc(i.label)}</strong><small>${esc(i.tag)}</small></span><span class="arrow">↗</span>`; b.onclick=i.run; box.append(b); });
+}
+$("#command-button").onclick=()=>{ $("#search").value=""; paletteResults(); openDialog($("#search-dialog")); setTimeout(()=>$("#search").focus(),40); };
+$("#search").oninput=paletteResults;
+document.addEventListener("keydown",e=>{ if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="k"){ e.preventDefault(); if(!$("#entry-dialog").open&&!$("#search-dialog").open&&!$("#obsidian-dialog").open) $("#command-button").click(); } });
+
+function toast(msg){ const t=$("#toast"); t.textContent=msg; t.hidden=false; clearTimeout(toast._t); toast._t=setTimeout(()=>t.hidden=true,2400); }
+function clock(){ $("#clock").textContent=new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}); }
+clock(); setInterval(clock,1000);
+show("Command");
+</script>
+</body>
+</html>

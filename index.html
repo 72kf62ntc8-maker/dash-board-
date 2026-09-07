@@ -164,6 +164,14 @@
   #search-results{display:grid;gap:7px;margin-top:14px;max-height:52vh;overflow:auto}
   #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--accent-hot);color:#2d0c08;border-radius:5px;padding:12px 20px;font-weight:600;z-index:60}
 
+  .bars{display:flex;align-items:flex-end;gap:8px;height:120px}
+  .bar-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;height:100%}
+  .bar-track{flex:1;width:100%;display:flex;align-items:flex-end;background:#1a1012;border-radius:2px;overflow:hidden}
+  .bar-fill{width:100%;background:linear-gradient(180deg,#ff9687,#8c2f28);border-radius:2px 2px 0 0;min-height:2px}
+  .bar-hit{background:linear-gradient(180deg,#ffd1c7,#ff6d59)}
+  .bar-lab{font:10px "Courier New",monospace;color:var(--muted)}
+  code{font:12px "Courier New",monospace;color:var(--accent-hot)}
+
   @keyframes spin{to{transform:rotate(360deg)}}
   @media (prefers-reduced-motion:reduce){.reactor .orbit{animation:none!important}}
 
@@ -211,6 +219,7 @@
   <div id="view-command"></div>
   <div id="view-fitness" hidden></div>
   <div id="view-food" hidden></div>
+  <div id="view-steps" hidden></div>
   <div id="view-generic" hidden></div>
 </main>
 
@@ -344,6 +353,45 @@ function weeklyRate(trendSeries){
   return (last.trend-first.trend)/days*7;
 }
 
+// ---- Steps ----
+//
+// A web page CANNOT read Apple Health or Health Connect — those are native
+// APIs with no browser access. So steps arrive one of two ways:
+//   1. Typed in, or
+//   2. Pushed in by an Apple Shortcut that reads Health and opens this page
+//      with ?steps=NNNN (see ingestStepsFromUrl below).
+// Stored per day: { "YYYY-MM-DD": 12345 }
+const DEFAULT_STEP_GOAL = 15000;
+const getStepGoal = ()=>DB.get("stepGoal", DEFAULT_STEP_GOAL);
+const getSteps = ()=>DB.get("steps", {});
+function setSteps(dateKey, count){ const s=getSteps(); s[dateKey]=count; DB.set("steps",s); }
+/** The last `n` days, oldest first, as [{date,count}]. */
+function stepDays(n=7){
+  const out=[]; const s=getSteps(); const c=new Date();
+  for(let i=n-1;i>=0;i--){ const d=new Date(c); d.setDate(c.getDate()-i); const k=todayKey(d);
+    out.push({date:k, count:+s[k]||0, label:d.toLocaleDateString(undefined,{weekday:"short"})[0]}); }
+  return out;
+}
+
+/**
+ * An Apple Shortcut can't POST to a static page, but it CAN open a URL. So a
+ * Shortcut that reads today's step count and opens
+ *   https://<site>/?steps=12345
+ * hands the number over with no backend at all. The param is applied once and
+ * then stripped from the address bar so a refresh can't double-apply it.
+ */
+function ingestStepsFromUrl(){
+  const q=new URLSearchParams(location.search);
+  const raw=q.get("steps"); if(raw===null) return null;
+  const n=Math.round(parseFloat(raw));
+  // Reject nonsense rather than writing a bogus day.
+  if(!isFinite(n)||n<0||n>200000) return null;
+  const day=/^\d{4}-\d{2}-\d{2}$/.test(q.get("date")||"") ? q.get("date") : todayKey();
+  setSteps(day,n);
+  try{ history.replaceState({},"",location.pathname); }catch(e){}
+  return {day,n};
+}
+
 // ---- The coach: rules over food + lifts + mat + weight ----
 function runCoach(){
   const out=[];
@@ -395,6 +443,12 @@ function runCoach(){
   }
   if(Object.keys(weigh).length && weigh[day]===undefined){
     out.push(["No weigh-in today — log it to keep your trend honest.","info"]);
+  }
+  // Steps — only worth mentioning once the day is mostly gone.
+  const stepsToday=+getSteps()[day]||0; const stepGoal=getStepGoal();
+  if(stepsToday>0){
+    if(stepsToday>=stepGoal) out.push([`${stepsToday.toLocaleString()} steps — goal hit.`,"good"]);
+    else if(new Date().getHours()>=17) out.push([`${(stepGoal-stepsToday).toLocaleString()} steps to go to hit ${stepGoal.toLocaleString()}.`,"warn"]);
   }
   // Nothing logged
   if(!mma.length && !lifts.length) out.push(["No training logged yet — log your first session.","info"]);
@@ -464,7 +518,7 @@ const OB = (()=>{
 // NAV + VIEW ROUTING
 // ============================================================================
 const MODULES = [
-  {id:"Command", ic:"◈"},{id:"Fitness", ic:"⌁"},{id:"Food", ic:"◉"},{id:"Planner", ic:"☷"},
+  {id:"Command", ic:"◈"},{id:"Fitness", ic:"⌁"},{id:"Steps", ic:"⇡"},{id:"Food", ic:"◉"},{id:"Planner", ic:"☷"},
   {id:"Calendar", ic:"▦"},{id:"Journal", ic:"▤"},{id:"Reselling", ic:"⬡"},{id:"Money", ic:"$"},
 ];
 // Quick actions. New Quote (Quotes) and Review QR (Reviews) were removed at
@@ -475,6 +529,7 @@ const ACTIONS = [
   {label:"Log Lift", module:"Fitness", icon:"▤", tag:"Training"},
   {label:"Log Session", module:"Fitness", icon:"◎", tag:"Mat · plyo · conditioning"},
   {label:"Log Weight", module:"Fitness", icon:"◑", tag:"Body"},
+  {label:"Log Steps", module:"Steps", icon:"⇡", tag:"Movement"},
   {label:"Add Event", module:"Calendar", icon:"▦", tag:"Schedule"},
   {label:"Journal", module:"Journal", icon:"✎", tag:"Reflection"},
   {label:"Log Sale", module:"Reselling", icon:"⬡", tag:"Business"},
@@ -501,11 +556,13 @@ function show(name){
   $("#view-command").hidden = name!=="Command";
   $("#view-fitness").hidden = name!=="Fitness";
   $("#view-food").hidden = name!=="Food";
+  $("#view-steps").hidden = name!=="Steps";
   $("#view-generic").hidden = !GENERIC[name];
   const heads = {
     Command:["Personal operations","Command center.","A clear view of what comes next."],
     Fitness:["Training","Fitness.","Lifts, mat work, plyo, and the week's plan."],
     Food:["Nutrition","Food.","Today against your targets."],
+    Steps:["Movement","Steps.","Today against your daily goal."],
     Planner:["Planning","Planner.","What needs doing."],
     Calendar:["Schedule","Calendar.","What's coming up."],
     Journal:["Reflection","Journal.","Notes to yourself."],
@@ -516,6 +573,7 @@ function show(name){
   if(name==="Command") renderCommand();
   else if(name==="Fitness") renderFitness();
   else if(name==="Food") renderFood();
+  else if(name==="Steps") renderSteps();
   else renderGeneric(name);
 }
 
@@ -523,11 +581,12 @@ function show(name){
 function ring(value, target, label, unit){
   const pct = target>0 ? Math.min(1, value/target) : 0;
   const r=52, c=2*Math.PI*r, off=c*(1-pct);
+  const fmt=n=>Math.round(n)>=10000?Math.round(n).toLocaleString():String(Math.round(n));
   return `<div class="ring"><svg width="118" height="118" viewBox="0 0 118 118">
     <circle cx="59" cy="59" r="${r}" fill="none" stroke="#2a1a1b" stroke-width="7"/>
     <circle cx="59" cy="59" r="${r}" fill="none" stroke="var(--accent)" stroke-width="7" stroke-linecap="round"
       stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}"/>
-  </svg><div class="val"><b>${Math.round(value)}</b><small>${label}<br/>/${target}${unit||""}</small></div></div>`;
+  </svg><div class="val"><b>${fmt(value)}</b><small>${label}<br/>/${fmt(target)}${unit||""}</small></div></div>`;
 }
 
 /** Small inline trend line. Returns "" when there is not enough to plot. */
@@ -577,6 +636,7 @@ function renderCommand(){
         <div class="rings">
           ${ring(totals.calories,t.calories,"KCAL","")}
           ${ring(totals.protein,t.protein,"PROTEIN","g")}
+          ${ring(+getSteps()[day]||0,getStepGoal(),"STEPS","")}
         </div>
       </div>
     </div>
@@ -598,6 +658,7 @@ function runAction(a){
   if(a.label==="Log Lift"){ show("Fitness"); openLift(); return; }
   if(a.label==="Log Session"){ show("Fitness"); openMat(); return; }
   if(a.label==="Log Weight"){ show("Fitness"); openWeight(); return; }
+  if(a.label==="Log Steps"){ show("Steps"); openSteps(); return; }
   const g=GENERIC[a.module]; if(g){ show(a.module); openEntry(a.module); }
 }
 
@@ -710,6 +771,99 @@ function renderFood(){
   $("#food-obsidian").onclick=openObsidian;
   $("#food-targets").onclick=openTargets;
   $("#view-food").querySelectorAll("[data-food]").forEach(b=>b.onclick=()=>{ const log=DB.get("foodLog",{}); const day=todayKey(); (log[day]||[]).splice(+b.dataset.food,1); DB.set("foodLog",log); renderFood(); if(current==="Command")renderCommand(); });
+}
+
+// ---- STEPS ----
+function renderSteps(){
+  const goal=getStepGoal(); const day=todayKey(); const today=+getSteps()[day]||0;
+  const days=stepDays(7);
+  const max=Math.max(goal, ...days.map(d=>d.count)) || goal;
+  const hit=days.filter(d=>d.count>=goal).length;
+  const avg=Math.round(days.reduce((a,d)=>a+d.count,0)/days.length);
+  // The URL a Shortcut should open. origin+pathname so it works on the real
+  // domain and from a local file alike.
+  const pushUrl=`${location.origin}${location.pathname}?steps=`;
+
+  $("#view-steps").innerHTML = `
+    <div class="grid cols-2">
+      <div class="panel">
+        <div class="section-title"><h2>Today</h2><button class="primary" id="st-add">Log steps</button></div>
+        <div class="rings">${ring(today,goal,"STEPS","")}</div>
+        <p class="muted" style="margin:10px 0 0">
+          ${today>=goal ? `Goal hit — ${today.toLocaleString()} steps.`
+                        : `${(goal-today).toLocaleString()} to go of ${goal.toLocaleString()}.`}
+        </p>
+        <button class="ghost" id="st-goal">Change goal</button>
+      </div>
+      <div class="panel">
+        <div class="section-title"><h2>Last 7 days</h2><span class="tag">${hit}/7 HIT</span></div>
+        <div class="bars">
+          ${days.map(d=>`<div class="bar-col">
+            <div class="bar-track"><div class="bar-fill${d.count>=goal?" bar-hit":""}" style="height:${Math.round((d.count/max)*100)}%"></div></div>
+            <span class="bar-lab">${d.label}</span></div>`).join("")}
+        </div>
+        <p class="muted" style="margin:10px 0 0">Average ${avg.toLocaleString()} / day</p>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="section-title"><h2>Connect Apple Health</h2><span class="tag">IOS SHORTCUT</span></div>
+      <p class="muted" style="font-size:14px;margin:0 0 10px">
+        A web page can't read Apple Health directly — Health is a native API with no browser
+        access. An Apple Shortcut can, though: it reads today's step count and opens this page
+        with the number attached, which lands it here. No account, no server.
+      </p>
+      <ol class="muted" style="font-size:14px;line-height:1.8;padding-left:20px;margin:0">
+        <li>Open <strong>Shortcuts</strong> → <strong>+</strong> → add action <strong>Find Health Samples</strong>.</li>
+        <li>Set Type to <strong>Steps</strong>, Sort by <strong>Start Date</strong>, and filter to <strong>Today</strong>.</li>
+        <li>Add <strong>Calculate Statistics</strong> → <strong>Sum</strong> over those samples.</li>
+        <li>Add <strong>Open URLs</strong> and set the URL to the one below, with the Sum on the end.</li>
+        <li>Optional: under Automation, run it daily so it keeps itself up to date.</li>
+      </ol>
+      <label>URL to use in the Shortcut</label>
+      <input id="st-url" readonly value="${esc(pushUrl)}" onclick="this.select()" />
+      <p class="faint" style="font-size:12px;margin:8px 0 0">
+        Put the Sum variable directly after the <code>=</code>, e.g. <code>${esc(pushUrl)}12345</code>.
+        Add <code>&amp;date=YYYY-MM-DD</code> to backfill a past day.
+      </p>
+    </div>
+
+    <div class="panel">
+      <div class="section-title"><h2>History</h2></div>
+      <div>${(()=>{ const all=Object.keys(getSteps()).sort().reverse().slice(0,14);
+        return all.length ? all.map(k=>`<div class="entry"><div class="body">
+          <strong>${(+getSteps()[k]).toLocaleString()} steps</strong>
+          <small>${esc(new Date(k+"T12:00:00").toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"}))}${(+getSteps()[k])>=goal?" · goal hit":""}</small>
+          </div><button class="del" data-stepdel="${esc(k)}" aria-label="Remove">×</button></div>`).join("")
+        : `<p class="empty">No steps logged yet.</p>`; })()}</div>
+    </div>`;
+
+  $("#st-add").onclick=openSteps;
+  $("#st-goal").onclick=openStepGoal;
+  $("#view-steps").querySelectorAll("[data-stepdel]").forEach(b=>b.onclick=()=>{
+    const s=getSteps(); delete s[b.dataset.stepdel]; DB.set("steps",s); renderSteps(); });
+}
+
+function openSteps(){
+  const day=todayKey(); const cur=getSteps()[day];
+  $("#entry-title").textContent="Log steps";
+  $("#entry-fields").innerHTML=`<label>Steps today</label>
+    <input id="sp-val" inputmode="numeric" value="${cur!=null?cur:""}" placeholder="12500"/>
+    <p class="muted" style="font-size:13px;margin:8px 0 0">One entry per day — saving again updates today.</p>`;
+  $("#entry-form").onsubmit=e=>{ e.preventDefault(); const v=Math.round(parseFloat($("#sp-val").value));
+    if(!isFinite(v)||v<0||v>200000) return;
+    setSteps(todayKey(),v); $("#entry-dialog").close(); toast("Steps logged"); renderSteps(); };
+  openDialog($("#entry-dialog")); setTimeout(()=>$("#sp-val").focus(),40);
+}
+
+function openStepGoal(){
+  $("#entry-title").textContent="Daily step goal";
+  $("#entry-fields").innerHTML=`<label>Goal</label>
+    <input id="sg-val" inputmode="numeric" value="${getStepGoal()}"/>`;
+  $("#entry-form").onsubmit=e=>{ e.preventDefault(); const v=Math.round(parseFloat($("#sg-val").value));
+    if(!isFinite(v)||v<=0||v>200000) return;
+    DB.set("stepGoal",v); $("#entry-dialog").close(); toast("Goal updated"); renderSteps(); };
+  openDialog($("#entry-dialog")); setTimeout(()=>$("#sg-val").focus(),40);
 }
 
 // ---- GENERIC list sections ----
@@ -868,7 +1022,10 @@ document.addEventListener("keydown",e=>{ if((e.ctrlKey||e.metaKey)&&e.key.toLowe
 function toast(msg){ const t=$("#toast"); t.textContent=msg; t.hidden=false; clearTimeout(toast._t); toast._t=setTimeout(()=>t.hidden=true,2400); }
 function clock(){ $("#clock").textContent=new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}); }
 clock(); setInterval(clock,1000);
-show("Command");
+// A Shortcut may have opened us with ?steps=NNNN — apply it before rendering.
+const ingested=ingestStepsFromUrl();
+show(ingested ? "Steps" : "Command");
+if(ingested) toast(`${ingested.n.toLocaleString()} steps saved`);
 </script>
 </body>
 </html>

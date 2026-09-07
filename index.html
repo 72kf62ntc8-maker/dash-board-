@@ -279,7 +279,11 @@ const DISCIPLINES = [
   {id:"muay_thai",label:"Muay Thai",impact:1.15},{id:"boxing",label:"Boxing",impact:1.1},
   {id:"wrestling",label:"Wrestling",impact:1.25},{id:"mma",label:"MMA",impact:1.25},
   {id:"conditioning",label:"Conditioning",impact:0.9},
+  {id:"plyometrics",label:"Plyometrics",impact:1.1},
 ];
+// Which disciplines actually involve taking contact. Used by the coach so a
+// hard plyo or conditioning session doesn't get told to "spar less".
+const CONTACT = new Set(["bjj_gi","bjj_nogi","muay_thai","boxing","wrestling","mma"]);
 const INTENSITIES = [
   {id:"technical",label:"Technical",rpe:3,hint:"Drilling, flow, light"},
   {id:"hard",label:"Hard",rpe:6,hint:"Live rounds, positional"},
@@ -301,7 +305,8 @@ const hardWithin = (list,days,now=Date.now())=>withinDays(list,days,now).filter(
 
 // ---- Weekly plan ----
 const DAY_LABELS = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
-const SLOTS = [{id:"lift",label:"Lift"},{id:"mat",label:"Mat"},{id:"conditioning",label:"Conditioning"},{id:"rest",label:"Rest"}];
+const SLOTS = [{id:"lift",label:"Lift"},{id:"mat",label:"Mat"},{id:"plyo",label:"Plyo"},{id:"conditioning",label:"Conditioning"},{id:"rest",label:"Rest"}];
+const slotLabel = id=>SLOTS.find(s=>s.id===id)?.label.toLowerCase() ?? id;
 const DEFAULT_PLAN = {Mon:["lift"],Tue:["mat"],Wed:["lift"],Thu:["mat"],Fri:["lift"],Sat:["mat","conditioning"],Sun:["rest"]};
 const dayIdx = d=>(d.getDay()+6)%7;
 const plannedToday = plan=>plan[DAY_LABELS[dayIdx(new Date())]] ?? [];
@@ -358,7 +363,7 @@ function runCoach(){
   const trainedToday = mma.some(s=>todayKey(new Date(s.date))===day) || lifts.some(w=>todayKey(new Date(w.date))===day);
   if(pt.length && !trainedToday){
     if(pt.length===1&&pt[0]==="rest") out.push(["Today is a rest day on your plan — take it.","info"]);
-    else out.push([`Plan says ${pt.map(p=>p==="mat"?"mat work":p).join(" and ")} today.`,"info"]);
+    else out.push([`Plan says ${pt.map(p=>p==="mat"?"mat work":slotLabel(p)).join(" and ")} today.`,"info"]);
   }
   // Mat volume spike
   const acwr=acuteChronic(mma);
@@ -378,9 +383,11 @@ function runCoach(){
   // ---- Weight ----
   // Cutting hard WHILE taking contact is the cross-reference a food app or a
   // gym app can't make on its own, so it outranks the plain "cutting fast".
-  const hardWeek=hardWithin(mma,7);
-  if(pctWeek!=null && rate<0 && pctWeek>0.8 && hardWeek>=2){
-    out.push([`You're cutting fast with ${hardWeek} hard sessions this week — eat more or spar less.`,"warn"]);
+  // Only contact sessions justify "spar less" — hard plyo or conditioning is
+  // taxing, but the advice for it is different.
+  const hardContact=withinDays(mma,7).filter(s=>CONTACT.has(s.discipline)&&(s.intensity==="hard"||s.intensity==="sparring")).length;
+  if(pctWeek!=null && rate<0 && pctWeek>0.8 && hardContact>=2){
+    out.push([`You're cutting fast with ${hardContact} hard sessions this week — eat more or spar less.`,"warn"]);
   } else if(pctWeek!=null && rate<0 && pctWeek>1){
     out.push([`Cutting fast at ${Math.abs(rate).toFixed(1)} lbs/wk — watch for strength loss.`,"warn"]);
   } else if(pctWeek!=null && rate<0 && pctWeek>=0.3){
@@ -466,7 +473,7 @@ const ACTIONS = [
   {label:"Add Food", module:"Food", icon:"◉", tag:"Nutrition"},
   {label:"Scan Food", module:"Food", icon:"⌗", tag:"Capture"},
   {label:"Log Lift", module:"Fitness", icon:"▤", tag:"Training"},
-  {label:"Log Mat Work", module:"Fitness", icon:"◎", tag:"Training"},
+  {label:"Log Session", module:"Fitness", icon:"◎", tag:"Mat · plyo · conditioning"},
   {label:"Log Weight", module:"Fitness", icon:"◑", tag:"Body"},
   {label:"Add Event", module:"Calendar", icon:"▦", tag:"Schedule"},
   {label:"Journal", module:"Journal", icon:"✎", tag:"Reflection"},
@@ -497,7 +504,7 @@ function show(name){
   $("#view-generic").hidden = !GENERIC[name];
   const heads = {
     Command:["Personal operations","Command center.","A clear view of what comes next."],
-    Fitness:["Training","Fitness.","Lifts, mat work, and the week's plan."],
+    Fitness:["Training","Fitness.","Lifts, mat work, plyo, and the week's plan."],
     Food:["Nutrition","Food.","Today against your targets."],
     Planner:["Planning","Planner.","What needs doing."],
     Calendar:["Schedule","Calendar.","What's coming up."],
@@ -589,7 +596,7 @@ const greeting=()=>{ const h=new Date().getHours(); return h<12?"morning":h<17?"
 function runAction(a){
   if(a.label==="Add Food"||a.label==="Scan Food"){ show("Food"); openFood(a.label==="Scan Food"); return; }
   if(a.label==="Log Lift"){ show("Fitness"); openLift(); return; }
-  if(a.label==="Log Mat Work"){ show("Fitness"); openMat(); return; }
+  if(a.label==="Log Session"){ show("Fitness"); openMat(); return; }
   if(a.label==="Log Weight"){ show("Fitness"); openWeight(); return; }
   const g=GENERIC[a.module]; if(g){ show(a.module); openEntry(a.module); }
 }
@@ -609,7 +616,7 @@ function renderFitness(){
       <div class="panel">
         <div class="section-title"><h2>Log training</h2><span class="tag">~3 TAPS</span></div>
         <div class="row" style="gap:10px;flex-wrap:wrap">
-          <button class="primary" id="f-mat">Log mat work</button>
+          <button class="primary" id="f-mat">Log session</button>
           <button class="btn" id="f-lift">Log a lift</button>
           <button class="btn" id="f-obsidian">Import Obsidian</button>
         </div>
@@ -638,11 +645,11 @@ function renderFitness(){
     </div>
 
     <div class="panel">
-      <div class="section-title"><h2>Recent mat work</h2></div>
+      <div class="section-title"><h2>Recent sessions</h2></div>
       <div id="mat-list">${mma.length ? mma.slice(0,8).map(s=>`
         <div class="entry"><div class="body"><strong>${esc(discLabel(s.discipline))} · ${s.minutes} min · ${esc(inten(s.intensity)?.label||s.intensity)}</strong>
         <small>${esc(new Date(s.date).toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"}))}</small>
-        ${s.notes?`<p>${esc(s.notes)}</p>`:""}</div><span class="accent" style="font-weight:600">${sessionLoad(s)}</span></div>`).join("") : `<p class="empty">No mat sessions yet.</p>`}</div>
+        ${s.notes?`<p>${esc(s.notes)}</p>`:""}</div><span class="accent" style="font-weight:600">${sessionLoad(s)}</span></div>`).join("") : `<p class="empty">No sessions yet.</p>`}</div>
     </div>
 
     <div class="panel">
@@ -764,7 +771,7 @@ function openFood(scan){
 // Mat work capture
 function openMat(){
   let d0=DISCIPLINES[0].id, i0="hard", min=60;
-  $("#entry-title").textContent="Log mat work";
+  $("#entry-title").textContent="Log session";
   $("#entry-fields").innerHTML=`
     <label>Discipline</label><div class="chip-row" id="mm-disc"></div>
     <label>Intensity</label><div class="chip-row" id="mm-int"></div>

@@ -311,6 +311,34 @@ function consecutiveTrainingDays(dateSet, today){
   return n;
 }
 
+// ---- Weight: series -> EMA trend -> weekly rate ----
+//
+// Daily weight is noisy (water, food timing, salt), so a raw day-to-day
+// reading tells you almost nothing. The trend is an exponential moving
+// average, which is what makes "am I actually losing weight" answerable.
+const TREND_SMOOTHING = 0.1;
+function weightSeries(weighins){
+  return Object.keys(weighins||{}).sort().map(d=>({date:d, weight:+weighins[d]}));
+}
+function computeTrend(series){
+  let trend=null;
+  return series.map(pt=>{ trend = trend===null ? pt.weight : trend + TREND_SMOOTHING*(pt.weight-trend);
+    return {...pt, trend}; });
+}
+/** lbs/week change in the trend over the last ~2 weeks. Negative = losing. */
+function weeklyRate(trendSeries){
+  if(trendSeries.length<2) return null;
+  const last=trendSeries[trendSeries.length-1];
+  // Walk back to the oldest point within 14 days of the newest.
+  const cutoff=new Date(last.date+"T00:00:00").getTime()-14*864e5;
+  const window=trendSeries.filter(p=>new Date(p.date+"T00:00:00").getTime()>=cutoff);
+  if(window.length<2) return null;
+  const first=window[0];
+  const days=(new Date(last.date)-new Date(first.date))/864e5;
+  if(days<1) return null;
+  return (last.trend-first.trend)/days*7;
+}
+
 // ---- The coach: rules over food + lifts + mat + weight ----
 function runCoach(){
   const out=[];
@@ -318,6 +346,12 @@ function runCoach(){
   const foodLog=DB.get("foodLog",{}); const totals=foodTotals(foodLog[day]); const t=getTargets();
   const mma=DB.get("mma",[]); const lifts=DB.get("lifts",[]); const plan=DB.get("plan",DEFAULT_PLAN);
   const weigh=DB.get("weighins",{});
+  const trendSeries=computeTrend(weightSeries(weigh));
+  const trendWeight=trendSeries.length?trendSeries[trendSeries.length-1].trend:null;
+  const rate=weeklyRate(trendSeries);
+  // Rate as a % of bodyweight, so "fast" scales to the person rather than
+  // being a fixed pounds number.
+  const pctWeek = (rate!=null&&trendWeight) ? Math.abs(rate)/trendWeight*100 : null;
 
   // Plan for today
   const pt=plannedToday(plan);
@@ -341,6 +375,20 @@ function runCoach(){
   // Fuel a mat day
   const matMin=mma.filter(s=>todayKey(new Date(s.date))===day).reduce((a,s)=>a+(+s.minutes||0),0);
   if(matMin>=45 && totals.protein < t.protein-10) out.push([`${matMin} min on the mat today — still ${Math.round(t.protein-totals.protein)}g of protein to go.`,"warn"]);
+  // ---- Weight ----
+  // Cutting hard WHILE taking contact is the cross-reference a food app or a
+  // gym app can't make on its own, so it outranks the plain "cutting fast".
+  const hardWeek=hardWithin(mma,7);
+  if(pctWeek!=null && rate<0 && pctWeek>0.8 && hardWeek>=2){
+    out.push([`You're cutting fast with ${hardWeek} hard sessions this week — eat more or spar less.`,"warn"]);
+  } else if(pctWeek!=null && rate<0 && pctWeek>1){
+    out.push([`Cutting fast at ${Math.abs(rate).toFixed(1)} lbs/wk — watch for strength loss.`,"warn"]);
+  } else if(pctWeek!=null && rate<0 && pctWeek>=0.3){
+    out.push([`Good pace — trending down about ${Math.abs(rate).toFixed(1)} lbs/wk.`,"good"]);
+  }
+  if(Object.keys(weigh).length && weigh[day]===undefined){
+    out.push(["No weigh-in today — log it to keep your trend honest.","info"]);
+  }
   // Nothing logged
   if(!mma.length && !lifts.length) out.push(["No training logged yet — log your first session.","info"]);
   if(out.length===0) out.push(["Nothing stands out. Keep it up.","good"]);
@@ -419,6 +467,7 @@ const ACTIONS = [
   {label:"Scan Food", module:"Food", icon:"⌗", tag:"Capture"},
   {label:"Log Lift", module:"Fitness", icon:"▤", tag:"Training"},
   {label:"Log Mat Work", module:"Fitness", icon:"◎", tag:"Training"},
+  {label:"Log Weight", module:"Fitness", icon:"◑", tag:"Body"},
   {label:"Add Event", module:"Calendar", icon:"▦", tag:"Schedule"},
   {label:"Journal", module:"Journal", icon:"✎", tag:"Reflection"},
   {label:"Log Sale", module:"Reselling", icon:"⬡", tag:"Business"},
@@ -472,6 +521,16 @@ function ring(value, target, label, unit){
     <circle cx="59" cy="59" r="${r}" fill="none" stroke="var(--accent)" stroke-width="7" stroke-linecap="round"
       stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}"/>
   </svg><div class="val"><b>${Math.round(value)}</b><small>${label}<br/>/${target}${unit||""}</small></div></div>`;
+}
+
+/** Small inline trend line. Returns "" when there is not enough to plot. */
+function sparkline(trendSeries){
+  const pts=trendSeries.slice(-30); if(pts.length<3) return "";
+  const vals=pts.map(p=>p.trend); const min=Math.min(...vals), max=Math.max(...vals);
+  const span=(max-min)||1, W=280, H=52;
+  const d=pts.map((p,i)=>`${i?"L":"M"}${(i/(pts.length-1)*W).toFixed(1)},${(H-((p.trend-min)/span)*H).toFixed(1)}`).join(" ");
+  return `<svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="margin-top:12px;overflow:visible">
+    <path d="${d}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
 }
 
 // ============================================================================
@@ -531,6 +590,7 @@ function runAction(a){
   if(a.label==="Add Food"||a.label==="Scan Food"){ show("Food"); openFood(a.label==="Scan Food"); return; }
   if(a.label==="Log Lift"){ show("Fitness"); openLift(); return; }
   if(a.label==="Log Mat Work"){ show("Fitness"); openMat(); return; }
+  if(a.label==="Log Weight"){ show("Fitness"); openWeight(); return; }
   const g=GENERIC[a.module]; if(g){ show(a.module); openEntry(a.module); }
 }
 
@@ -538,7 +598,11 @@ function runAction(a){
 function renderFitness(){
   const mma=DB.get("mma",[]); const lifts=DB.get("lifts",[]); const plan=DB.get("plan",DEFAULT_PLAN);
   const week=withinDays(mma,7); const weekMin=week.reduce((a,s)=>a+(+s.minutes||0),0);
-  const liftDates=new Set(lifts.map(w=>todayKey(new Date(w.date)))); const matDates=new Set(mma.map(s=>todayKey(new Date(s.date))));
+  const weigh=DB.get("weighins",{}); const wCount=Object.keys(weigh).length;
+  const trendSeries=computeTrend(weightSeries(weigh));
+  const trendWeight=trendSeries.length?trendSeries[trendSeries.length-1].trend:null;
+  const rate=weeklyRate(trendSeries);
+  const spark=sparkline(trendSeries);
 
   $("#view-fitness").innerHTML = `
     <div class="grid cols-2">
@@ -562,6 +626,15 @@ function renderFitness(){
     <div class="panel">
       <div class="section-title"><h2>Weekly plan</h2><span class="tag">TAP TO SET · REPEATS</span></div>
       <div id="plangrid"></div>
+    </div>
+
+    <div class="panel">
+      <div class="section-title"><h2>Weight</h2><button class="btn" id="f-weight">Log weight</button></div>
+      ${trendWeight!=null ? `
+        <p class="big">${trendWeight.toFixed(1)} <span class="muted" style="font-size:15px">lbs trend</span></p>
+        ${rate!=null ? `<p class="muted" style="margin:2px 0 0">${Math.abs(rate).toFixed(1)} lbs/week ${rate<0?"loss":"gain"} · ${wCount} weigh-in${wCount===1?"":"s"} logged</p>` : `<p class="muted" style="margin:2px 0 0">${wCount} weigh-in${wCount===1?"":"s"} — a few more days and a trend appears.</p>`}
+        ${spark}
+      ` : `<p class="empty">No weigh-ins yet. Log one, or import from Obsidian.</p>`}
     </div>
 
     <div class="panel">
@@ -597,6 +670,7 @@ function renderFitness(){
   });
 
   $("#f-mat").onclick=openMat; $("#f-lift").onclick=openLift; $("#f-obsidian").onclick=openObsidian;
+  $("#f-weight").onclick=openWeight;
 }
 
 // ---- FOOD ----
@@ -715,6 +789,20 @@ function openLift(){
     const l=DB.get("lifts",[]); l.unshift({id:uid(),date:new Date().toISOString(),exercises:[{name,sets}]}); DB.set("lifts",l);
     $("#entry-dialog").close(); toast("Lift logged"); renderFitness(); };
   openDialog($("#entry-dialog")); setTimeout(()=>$("#lf-name").focus(),40);
+}
+
+// Weight capture — one number, so it saves straight from the dialog. One
+// entry per day: logging again corrects the day rather than adding a second.
+function openWeight(){
+  const weigh=DB.get("weighins",{}); const day=todayKey();
+  $("#entry-title").textContent="Log weight";
+  $("#entry-fields").innerHTML=`<label>Weight (lbs)</label>
+    <input id="wt-val" inputmode="decimal" value="${weigh[day]!=null?weigh[day]:""}" placeholder="184.2"/>
+    <p class="muted" style="font-size:13px;margin:8px 0 0">One entry per day — saving again updates today.</p>`;
+  $("#entry-form").onsubmit=e=>{ e.preventDefault(); const v=parseFloat($("#wt-val").value); if(isNaN(v)||v<=0) return;
+    const w=DB.get("weighins",{}); w[todayKey()]=v; DB.set("weighins",w);
+    $("#entry-dialog").close(); toast("Weight logged"); renderFitness(); };
+  openDialog($("#entry-dialog")); setTimeout(()=>$("#wt-val").focus(),40);
 }
 
 // Targets

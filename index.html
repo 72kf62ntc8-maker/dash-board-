@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#07050D" />
 <title>Chaston's Dashboard</title>
 <!--
   Chaston's Dashboard — a self-contained personal command center.
@@ -12,198 +13,348 @@
   stores lives in the browser's localStorage under keys prefixed "cd_" — so
   the app is fully usable offline and your data never leaves the device.
 
-  Design: the JARVIS "red command center" look — deep black + oxblood
-  surfaces, vermilion and warm-white instrument accents, an arc-reactor dial,
-  monospace instrument labels. Reduced-motion is respected.
+  Design: the JARVIS command center, violet build. Four colours do the whole
+  job — near-black #07050D for the ground, dark violet #120D20 for panels,
+  electric purple #9B5CFF as the single accent, lavender #E8DFFF for text and
+  hot highlights. Depth comes from LAYERING translucent surfaces over that
+  ground with hairline violet rims, not from heavy shadows.
 
-  Sections (left nav): Command, Fitness, Food, Planner, Calendar, Journal,
-  Reselling, Money. Fitness is the built-out one — lifting + MMA/mat work, a
-  weekly training plan, a rules "coach", and an Obsidian import.
+  Motion is decorative only: a slow orbital core on the Command screen. It
+  follows the OS reduced-motion setting by default and can be paused outright
+  from the header control (the choice is remembered).
+
+  Sections (left nav): Command, Fitness, Steps, Food, Planner, Calendar,
+  Journal, Reselling, Money. Fitness is the built-out one — lifting + MMA/mat
+  work, a weekly training plan, a rules "coach", and an Obsidian import.
 -->
 <style>
   :root{
     color-scheme: dark;
-    --bg:#060506; --panel:#100c0d; --panel-2:#160e10; --line:#3c2427;
-    --line-strong:#74302d; --accent:#ff766d; --accent-hot:#ffd1c7;
-    --accent-bright:#ff5548; --text:#fff0ed; --muted:#bca4a3; --faint:#8b4b47;
-    --success:#4ed8a0; --warn:#e0a33e; --danger:#ff6356; --radius:4px;
+
+    /* ---- The four brief colours. Everything else derives from them. ---- */
+    --void:#07050D;      /* near-black — the page ground */
+    --violet:#120D20;    /* dark violet — the panel base */
+    --accent:#9b5cff;    /* electric purple — the one accent */
+    --lav:#e8dfff;       /* lavender — text and hot highlights */
+
+    /* ---- Layered translucent surfaces ----
+       Each level is the violet base at a higher opacity over the void, so a
+       panel nested in a panel reads as a step forward without a hard colour
+       jump. Translucent on purpose: the ambient violet light behind them
+       shows through. */
+    --s1:rgba(18,13,32,.58);
+    --s2:rgba(30,21,54,.70);
+    --s3:rgba(44,31,78,.78);
+    --rim:rgba(155,92,255,.15);        /* hairline edge — default */
+    --rim-strong:rgba(155,92,255,.34); /* emphasised edge — focus, active */
+    --tint:rgba(155,92,255,.12);       /* selected-row wash */
+    --glow:rgba(155,92,255,.30);
+
+    --text:var(--lav);
+    --muted:#a294c6;   /* secondary text */
+    --faint:#6d5f93;   /* placeholders, disabled, meta */
+
+    --success:#4ed8a0; --warn:#e9b44c; --danger:#ff6b8a;
+    --radius:12px; --radius-sm:8px;
+    --dur:.16s;
   }
+  /* The pause control and the OS setting both land here. `--dur:0s` collapses
+     every transition as well, since a transition is motion too. */
+  html.still{--dur:0s}
+  html.still *,html.still *::before,html.still *::after{animation:none!important}
+
   *{box-sizing:border-box}
   html,body{margin:0}
   body{
-    background:radial-gradient(ellipse at 80% 0,#50100e24,transparent 50%),var(--bg);
+    /* Ambient violet lighting: two soft, wide, low-opacity pools over the
+       near-black ground. Fixed so they don't slide around on scroll. */
+    background:
+      radial-gradient(900px 520px at 78% -8%, rgba(155,92,255,.16), transparent 62%),
+      radial-gradient(700px 480px at 4% 104%, rgba(90,48,168,.15), transparent 60%),
+      var(--void);
+    background-attachment:fixed;
     color:var(--text);
-    font:16px/1.5 "Segoe UI",system-ui,-apple-system,Arial,sans-serif;
+    font:16px/1.55 "Segoe UI",system-ui,-apple-system,Arial,sans-serif;
     min-height:100vh;
+    -webkit-font-smoothing:antialiased;
   }
   button,input,textarea,select{font:inherit;color:inherit}
   button{cursor:pointer;background:none;border:0}
-  button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
-    outline:2px solid var(--accent);outline-offset:3px
-  }
-  .eyebrow{font:11px/1.5 "Courier New",monospace;letter-spacing:2px;color:var(--muted);text-transform:uppercase}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:3px}
+  .eyebrow{font:11px/1.5 ui-monospace,"SF Mono","Courier New",monospace;letter-spacing:2.2px;color:var(--muted);text-transform:uppercase}
   [hidden]{display:none!important}
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+  .skip{position:absolute;left:10px;top:-60px;z-index:80;background:var(--accent);color:#140a29;padding:10px 16px;border-radius:var(--radius-sm);font-weight:600;transition:top var(--dur)}
+  .skip:focus{top:10px}
+
+  /* ---- Line icons: one stroke weight everywhere, inherits colour ---- */
+  .i{width:1.25em;height:1.25em;flex:none;stroke:currentColor;fill:none;
+     stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;vertical-align:-.25em}
 
   /* ---- Shell: fixed left rail + scrolling main ---- */
   aside{
-    position:fixed;inset:0 auto 0 0;width:216px;padding:32px 18px;
-    background:linear-gradient(90deg,#090708,#130b0c);border-right:1px solid var(--line);
+    position:fixed;inset:0 auto 0 0;width:226px;padding:30px 16px;
+    background:linear-gradient(180deg,rgba(18,13,32,.92),rgba(7,5,13,.94));
+    border-right:1px solid var(--rim);backdrop-filter:blur(14px);
     display:flex;flex-direction:column;z-index:20;
   }
-  .brand{display:flex;align-items:center;gap:10px;color:var(--text);text-decoration:none;font-size:22px;font-weight:650;letter-spacing:3px}
-  .brand-mark{color:var(--accent-bright);font-size:26px;text-shadow:0 0 18px #ff3b29}
-  .brand .sub{display:block;font:9px/2 "Courier New",monospace;letter-spacing:2px;color:var(--faint)}
-  nav{display:grid;gap:4px;margin-top:34px}
-  nav button{display:flex;align-items:center;gap:12px;color:var(--muted);padding:10px 12px;text-align:left;border-radius:5px;border:1px solid transparent;font-size:14px;width:100%}
-  nav button .ic{width:22px;font-size:16px;text-align:center;color:var(--faint)}
-  nav button:hover{color:var(--text);background:#261113}
-  nav button.active{color:var(--accent-hot);border-color:var(--line-strong);background:linear-gradient(90deg,#541a19aa,#1c0d0d);box-shadow:inset 2px 0 var(--accent)}
-  nav button.active .ic{color:var(--accent)}
-  .side-bottom{margin-top:auto;font:10px "Courier New",monospace;letter-spacing:1px;color:var(--faint)}
-  .status-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 10px #ff342e;margin-right:6px}
+  .brand{display:flex;align-items:center;gap:11px;color:var(--text);text-decoration:none;font-size:20px;font-weight:600;letter-spacing:2.5px}
+  .brand-mark{color:var(--accent);display:flex;filter:drop-shadow(0 0 10px var(--glow))}
+  .brand-mark .i{width:26px;height:26px;stroke-width:1.4}
+  .brand .sub{display:block;font:9px/2 ui-monospace,"Courier New",monospace;letter-spacing:2px;color:var(--faint)}
+  nav{display:grid;gap:2px;margin-top:26px}
+  nav button{display:flex;align-items:center;gap:12px;color:var(--muted);padding:10px 12px;text-align:left;
+    border-radius:var(--radius-sm);border:1px solid transparent;font-size:14.5px;width:100%;
+    transition:background var(--dur),color var(--dur),border-color var(--dur)}
+  nav button .i{color:var(--faint);transition:color var(--dur)}
+  nav button:hover{color:var(--text);background:var(--s2)}
+  nav button:hover .i{color:var(--accent)}
+  /* Selected state: filled surface + lit rim + a solid accent bar on the
+     leading edge, so it is unmistakable at a glance and not colour-only. */
+  nav button[aria-current]{color:var(--lav);background:linear-gradient(90deg,rgba(155,92,255,.20),var(--s2));
+    border-color:var(--rim-strong);box-shadow:inset 3px 0 var(--accent)}
+  nav button[aria-current] .i{color:var(--accent)}
+  .side-bottom{margin-top:auto;font:10px/1.7 ui-monospace,"Courier New",monospace;letter-spacing:1.2px;color:var(--faint)}
+  .status-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 10px var(--accent);margin-right:7px}
 
-  main{margin-left:216px;padding:0 34px 60px;max-width:1500px}
-  header{height:74px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line)}
-  .breadcrumb{font:11px "Courier New",monospace;letter-spacing:1.5px;color:var(--muted)}
-  .breadcrumb span{margin:0 10px;color:#47606d}
+  main{margin-left:226px;padding:0 34px 64px;max-width:1500px}
+  header{min-height:72px;display:flex;align-items:center;justify-content:space-between;gap:16px;
+    border-bottom:1px solid var(--rim);flex-wrap:wrap;padding:10px 0}
+  .breadcrumb{font:11px ui-monospace,"Courier New",monospace;letter-spacing:1.6px;color:var(--faint)}
+  .breadcrumb .sep{margin:0 9px}
   .breadcrumb strong{font-weight:400;color:var(--accent)}
-  .header-right{display:flex;align-items:center;gap:18px;font:12px "Courier New",monospace;color:var(--muted)}
-  .avatar{border:1px solid var(--line);padding:6px 11px;border-radius:50%}
+  .header-right{display:flex;align-items:center;gap:12px;font:12px ui-monospace,"Courier New",monospace;color:var(--muted)}
+  .icon-btn{display:flex;align-items:center;gap:7px;color:var(--muted);border:1px solid var(--rim);
+    background:var(--s1);padding:7px 11px;border-radius:99px;font-size:11px;letter-spacing:1.2px;
+    transition:background var(--dur),color var(--dur),border-color var(--dur)}
+  .icon-btn:hover{color:var(--lav);border-color:var(--rim-strong);background:var(--s2)}
+  .icon-btn[aria-pressed="true"]{color:var(--lav);border-color:var(--rim-strong);background:var(--tint)}
+  .avatar{border:1px solid var(--rim);background:var(--s2);width:32px;height:32px;border-radius:50%;
+    display:grid;place-items:center;font-size:12px;letter-spacing:0;color:var(--lav)}
 
-  .page-heading{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;padding:28px 0 22px}
-  h1{font-size:32px;letter-spacing:-1px;line-height:1.15;margin:6px 0 0;font-weight:500}
+  .page-heading{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;padding:26px 0 20px}
+  h1{font-size:32px;letter-spacing:-.8px;line-height:1.15;margin:6px 0 0;font-weight:500}
   h1 span,.accent{color:var(--accent)}
   .page-heading .lead{color:var(--muted);font-size:14px;margin:8px 0 0}
-  .command-button{display:flex;gap:14px;align-items:center;border:1px solid var(--line);background:var(--panel);color:var(--muted);padding:11px 14px;border-radius:5px;font-size:14px}
-  kbd{font:10px "Courier New",monospace;border:1px solid var(--line-strong);padding:2px 5px;border-radius:3px}
+
+  /* ---- Integrated action-search launcher ----
+     A real field in the page header, on every view — not a modal you have to
+     summon. Ctrl/Cmd-K just focuses it. */
+  .launcher{position:relative;width:min(380px,100%)}
+  .launcher-box{display:flex;align-items:center;gap:10px;border:1px solid var(--rim);
+    background:var(--s1);border-radius:var(--radius-sm);padding:0 11px;
+    transition:border-color var(--dur),background var(--dur)}
+  .launcher-box:focus-within{border-color:var(--rim-strong);background:var(--s2)}
+  .launcher-box .i{color:var(--faint)}
+  .launcher input{border:0;background:none;padding:11px 0;width:100%;font-size:14px;outline:none}
+  .launcher input::placeholder{color:var(--faint)}
+  kbd{font:10px ui-monospace,"Courier New",monospace;color:var(--faint);border:1px solid var(--rim);
+    padding:3px 6px;border-radius:5px;white-space:nowrap}
+  .launcher-list{position:absolute;z-index:40;top:calc(100% + 7px);left:0;right:0;margin:0;padding:6px;
+    list-style:none;max-height:60vh;overflow:auto;border:1px solid var(--rim-strong);border-radius:var(--radius);
+    background:rgba(16,11,29,.97);backdrop-filter:blur(16px);box-shadow:0 24px 50px -20px rgba(0,0,0,.85)}
+  .launcher-list li{display:flex;align-items:center;gap:11px;padding:10px 11px;border-radius:var(--radius-sm);cursor:pointer}
+  .launcher-list li .i{color:var(--accent)}
+  .launcher-list li .lab{font-size:14px}
+  .launcher-list li .sub{display:block;font-size:12px;color:var(--muted)}
+  .launcher-list li[aria-selected="true"]{background:var(--tint);box-shadow:inset 0 0 0 1px var(--rim-strong)}
+  .launcher-list .none{color:var(--muted);font-size:14px;padding:10px 11px}
 
   /* ---- Panels & primitives ---- */
-  .panel{border:1px solid var(--line);border-radius:var(--radius);background:linear-gradient(120deg,#160e10,#0b0809);padding:20px;margin-bottom:16px}
+  .panel{border:1px solid var(--rim);border-radius:var(--radius);background:var(--s1);
+    backdrop-filter:blur(12px);padding:20px;margin-bottom:16px;
+    box-shadow:inset 0 1px 0 rgba(232,223,255,.05)}
   .grid{display:grid;gap:16px}
   .cols-2{grid-template-columns:1.4fr 1fr}
-  .section-title{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:10px}
+  .section-title{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:12px;flex-wrap:wrap}
   .section-title h2{font-size:16px;font-weight:500;margin:0}
-  .primary{background:linear-gradient(#ffa08b,#ff6d59);color:#240b09;border:1px solid #ffb7a06b;padding:9px 15px;border-radius:var(--radius);font-size:14px;font-weight:600;box-shadow:0 0 22px #ff362119}
-  .primary:hover{background:#ffb19b}
-  .ghost{background:none;border:0;color:var(--accent);font-size:14px;padding:6px 0}
-  .btn{border:1px solid var(--line-strong);background:var(--panel-2);color:var(--text);padding:9px 14px;border-radius:var(--radius);font-size:14px}
-  .btn:hover{background:#311718;border-color:var(--accent)}
+  .primary{background:linear-gradient(180deg,#b985ff,#8a45f5);color:#fff;border:1px solid rgba(232,223,255,.22);
+    padding:9px 16px;border-radius:var(--radius-sm);font-size:14px;font-weight:600;
+    box-shadow:0 6px 20px -8px var(--glow);transition:filter var(--dur)}
+  .primary:hover{filter:brightness(1.12)}
+  .ghost{color:var(--accent);font-size:14px;padding:6px 0;transition:color var(--dur)}
+  .ghost:hover{color:var(--lav)}
+  .btn{border:1px solid var(--rim);background:var(--s2);color:var(--text);padding:9px 15px;
+    border-radius:var(--radius-sm);font-size:14px;transition:background var(--dur),border-color var(--dur)}
+  .btn:hover{background:var(--s3);border-color:var(--rim-strong)}
   label{display:block;font-size:13px;margin:14px 0 6px;color:var(--muted)}
-  input,textarea,select{width:100%;border:1px solid var(--line-strong);border-radius:var(--radius);background:#0b0708;padding:11px;font-size:15px}
+  input,textarea,select{width:100%;border:1px solid var(--rim);border-radius:var(--radius-sm);
+    background:rgba(7,5,13,.6);padding:11px;font-size:15px;transition:border-color var(--dur)}
+  input:focus,textarea:focus,select:focus{border-color:var(--rim-strong)}
   textarea{min-height:90px;resize:vertical;font-family:inherit}
-  .muted{color:var(--muted)}
-  .faint{color:var(--faint)}
+  .muted{color:var(--muted)} .faint{color:var(--faint)}
   .row{display:flex;align-items:center;gap:10px}
-  .chip{padding:6px 11px;border:1px solid var(--line);border-radius:var(--radius);font-size:13px;color:var(--muted);font-weight:600}
-  .chip.on{background:rgba(255,118,109,.13);border-color:var(--accent);color:var(--text)}
+  .chip{padding:6px 12px;border:1px solid var(--rim);border-radius:99px;font-size:13px;color:var(--muted);
+    font-weight:600;transition:background var(--dur),border-color var(--dur),color var(--dur)}
+  .chip:hover{border-color:var(--rim-strong);color:var(--text)}
+  .chip.on{background:var(--tint);border-color:var(--accent);color:var(--lav)}
   .chip-row{display:flex;flex-wrap:wrap;gap:6px}
-  .tag{font:10px "Courier New",monospace;letter-spacing:1px;color:var(--accent)}
+  .tag{font:10px ui-monospace,"Courier New",monospace;letter-spacing:1.4px;color:var(--accent)}
 
-  /* ---- Command: quick actions ---- */
+  /* ---- Quick actions: tab group + grid ---- */
+  .tabs{display:flex;gap:4px;padding:4px;border:1px solid var(--rim);background:var(--s1);
+    border-radius:99px;overflow:auto;scrollbar-width:none}
+  .tabs::-webkit-scrollbar{display:none}
+  .tabs button{padding:7px 15px;border-radius:99px;font-size:13px;font-weight:600;color:var(--muted);
+    white-space:nowrap;border:1px solid transparent;transition:background var(--dur),color var(--dur),border-color var(--dur)}
+  .tabs button:hover{color:var(--text);background:var(--s2)}
+  /* Selected tab: filled accent wash, lit rim, brighter label — three cues,
+     none of them colour alone. */
+  .tabs button[aria-selected="true"]{color:var(--lav);background:linear-gradient(180deg,rgba(155,92,255,.30),rgba(155,92,255,.16));
+    border-color:var(--rim-strong);box-shadow:0 2px 12px -4px var(--glow)}
+  .tabs .count{opacity:.6;margin-left:6px;font-weight:400}
+
   .actions{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-  .action{display:flex;align-items:center;gap:12px;text-align:left;padding:15px;border:1px solid var(--line-strong);background:linear-gradient(115deg,#1b1012,#100b0d);border-radius:2px;color:var(--text);position:relative}
-  .action:before{content:'';position:absolute;top:-1px;left:-1px;width:9px;height:9px;border-left:1px solid #bf6458;border-top:1px solid #bf6458}
-  .action:hover{background:#311718;border-color:var(--accent)}
-  .action .icon{font-size:20px;color:var(--accent);width:24px;text-align:center;text-shadow:0 0 12px #ff4c2c66}
+  .action{display:flex;align-items:center;gap:13px;text-align:left;padding:14px 15px;
+    border:1px solid var(--rim);background:var(--s2);border-radius:var(--radius-sm);color:var(--text);
+    transition:background var(--dur),border-color var(--dur),transform var(--dur)}
+  .action:hover{background:var(--s3);border-color:var(--rim-strong);transform:translateY(-1px)}
+  .action .i{width:20px;height:20px;color:var(--accent)}
+  .action .txt{min-width:0;flex:1}
   .action strong{display:block;font-size:14px;font-weight:500}
-  .action small{color:var(--muted);font-size:12px}
-  .action .arrow{margin-left:auto;color:var(--faint)}
+  .action small{display:block;color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .action .arrow{color:var(--faint);width:15px;height:15px;transition:color var(--dur)}
+  .action:hover .arrow{color:var(--accent)}
 
-  /* ---- Reactor + vitals rings ---- */
-  .hero{display:flex;align-items:center;justify-content:space-between;gap:20px;overflow:hidden;position:relative;
-    border:1px solid #844039;border-radius:var(--radius);padding:26px 32px;min-height:220px;
-    background:radial-gradient(ellipse at 72% 48%,#ac231c24 0,transparent 55%),linear-gradient(115deg,#170a0c,#080607 60%,#270b0d);
-    box-shadow:inset 0 1px #ff9b7255,inset 0 -1px #ff4d3b44}
+  /* ---- Hero: copy + slow decorative orbital core ---- */
+  .hero{display:flex;align-items:center;justify-content:space-between;gap:24px;position:relative;overflow:hidden;
+    border:1px solid var(--rim-strong);border-radius:var(--radius);padding:26px 32px;min-height:230px;margin-bottom:16px;
+    background:
+      radial-gradient(560px 300px at 78% 50%, rgba(155,92,255,.20), transparent 65%),
+      linear-gradient(120deg, rgba(30,21,54,.86), rgba(9,6,17,.92));
+    backdrop-filter:blur(12px);
+    box-shadow:inset 0 1px 0 rgba(232,223,255,.10)}
   .hero-copy{z-index:1;max-width:60%}
-  .hero h2{font-size:30px;font-weight:350;line-height:1.15;margin:10px 0 8px}
-  .hero h2 span{color:var(--accent-hot)}
+  .hero h2{font-size:30px;font-weight:350;line-height:1.18;margin:10px 0 8px}
+  .hero h2 span{color:var(--accent)}
   .hero p{color:var(--muted);font-size:14px;margin:0}
+
+  /* The orbital core. Purely decorative — it is not a reading of anything, so
+     it is aria-hidden and the number it frames is also printed in the copy.
+     Rotation is applied to SVG groups, which needs fill-box origins. */
+  .core-wrap{position:relative;width:190px;height:190px;flex:none}
+  .core-wrap svg{position:absolute;inset:0;width:100%;height:100%}
+  .core-wrap g{transform-box:fill-box;transform-origin:center}
+  .spin-a{animation:spin 150s linear infinite}
+  .spin-b{animation:spin 90s linear infinite reverse}
+  .spin-c{animation:spin 46s linear infinite}
+  .core-read{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+  .core-read b{font-size:32px;font-weight:600;color:var(--lav);text-shadow:0 0 22px var(--glow);line-height:1}
+  .core-read small{font:8px ui-monospace,"Courier New",monospace;letter-spacing:2.4px;color:var(--accent);margin-top:5px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* ---- Rings ---- */
   .rings{display:flex;gap:22px;flex-wrap:wrap}
-  .ring{position:relative;width:118px;height:118px;flex-shrink:0}
+  .ring{position:relative;width:118px;height:118px;flex:none}
   .ring svg{transform:rotate(-90deg)}
   .ring .val{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
   .ring .val b{font-size:22px;font-weight:600;color:var(--text)}
-  .ring .val small{font:9px "Courier New",monospace;letter-spacing:1px;color:var(--muted);margin-top:2px}
-
-  .reactor{position:relative;width:150px;height:150px;flex-shrink:0}
-  .reactor .orbit{position:absolute;border-radius:50%}
-  .reactor .o1{inset:0;border:2px dashed rgba(255,85,72,.42);animation:spin 90s linear infinite}
-  .reactor .o2{inset:22px;border:3px solid rgba(255,118,109,.5);border-left-color:transparent;border-right-color:transparent;animation:spin 40s linear infinite reverse}
-  .reactor .o3{inset:44px;border:1px solid #ff9687;box-shadow:0 0 22px #48dffb00,inset 0 0 18px #ff4c2c22}
-  .reactor .core{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
-  .reactor .core b{font-size:30px;color:var(--accent-hot);text-shadow:0 0 16px #ff5a3c99}
-  .reactor .core small{font:8px "Courier New",monospace;letter-spacing:2px;color:var(--accent)}
+  .ring .val small{font:9px ui-monospace,"Courier New",monospace;letter-spacing:1px;color:var(--muted);margin-top:3px}
 
   /* ---- Lists / entries ---- */
-  .entry{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-top:1px solid var(--line)}
+  .entry{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-top:1px solid var(--rim)}
   .entry:first-of-type{border-top:0}
-  .entry .body{flex:1}
+  .entry .body{flex:1;min-width:0}
   .entry strong{font-size:14px;font-weight:500;overflow-wrap:anywhere}
-  .entry small{display:block;color:var(--accent);font:11px "Courier New",monospace;letter-spacing:.5px;margin-top:2px}
+  .entry small{display:block;color:var(--accent);font:11px ui-monospace,"Courier New",monospace;letter-spacing:.5px;margin-top:3px}
   .entry p{color:var(--muted);font-size:13px;margin:5px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}
-  .entry .del{color:var(--faint);font-size:18px;padding:0 4px}
-  .entry .del:hover{color:var(--danger)}
+  .entry .del{color:var(--faint);display:flex;padding:2px;border-radius:5px;transition:color var(--dur),background var(--dur)}
+  .entry .del:hover{color:var(--danger);background:var(--s2)}
   .empty{color:var(--muted);font-size:14px;padding:14px 0}
-  .list-metric{display:flex;justify-content:space-between;font-size:14px;padding:6px 0;border-top:1px solid var(--line)}
+  .list-metric{display:flex;justify-content:space-between;gap:12px;font-size:14px;padding:8px 0;border-top:1px solid var(--rim)}
   .list-metric:first-child{border-top:0}
   .list-metric .k{color:var(--muted)}
-  .big{font-size:30px;font-weight:600;letter-spacing:-.5px}
-  .coach-line{font-size:14px;margin:0 0 8px;padding-left:12px;border-left:2px solid var(--line-strong)}
-  .coach-warn{border-left-color:var(--warn);color:#f0c886}
-  .coach-good{border-left-color:var(--success);color:#8fe6c2}
-  .coach-info{border-left-color:var(--line-strong);color:var(--muted)}
+  .big{font-size:30px;font-weight:600;letter-spacing:-.5px;margin:0}
+  .coach-line{font-size:14px;margin:0 0 8px;padding-left:12px;border-left:2px solid var(--rim-strong)}
+  .coach-warn{border-left-color:var(--warn);color:#f0d3a0}
+  .coach-good{border-left-color:var(--success);color:#a4e8cc}
+  .coach-info{border-left-color:var(--rim-strong);color:var(--muted)}
 
   /* ---- Dialogs ---- */
-  dialog{width:min(480px,calc(100% - 28px));border:1px solid #975348;border-radius:10px;background:#170e10;color:var(--text);padding:24px}
-  dialog::backdrop{background:#060203d9;backdrop-filter:blur(4px)}
+  dialog{width:min(480px,calc(100% - 28px));border:1px solid var(--rim-strong);border-radius:var(--radius);
+    background:rgba(20,14,36,.97);backdrop-filter:blur(18px);color:var(--text);padding:24px;
+    box-shadow:0 30px 70px -25px rgba(0,0,0,.9)}
+  dialog::backdrop{background:rgba(5,3,11,.78);backdrop-filter:blur(4px)}
   .dialog-top{display:flex;justify-content:space-between;align-items:center;gap:10px}
   .dialog-top h2{font-size:20px;margin:0}
-  .close{color:var(--muted);font-size:26px;line-height:1;padding:0 4px}
+  .close{color:var(--muted);display:flex;padding:4px;border-radius:6px;transition:color var(--dur),background var(--dur)}
+  .close:hover{color:var(--lav);background:var(--s2)}
   .dialog-actions{display:flex;gap:10px;margin-top:20px}
   .dialog-actions .primary{flex:1}
-  #search-results{display:grid;gap:7px;margin-top:14px;max-height:52vh;overflow:auto}
-  #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--accent-hot);color:#2d0c08;border-radius:5px;padding:12px 20px;font-weight:600;z-index:60}
+  #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--lav);color:#180d2e;
+    border-radius:99px;padding:11px 22px;font-weight:600;z-index:60;box-shadow:0 10px 30px -10px rgba(0,0,0,.8)}
 
   .bars{display:flex;align-items:flex-end;gap:8px;height:120px}
   .bar-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;height:100%}
-  .bar-track{flex:1;width:100%;display:flex;align-items:flex-end;background:#1a1012;border-radius:2px;overflow:hidden}
-  .bar-fill{width:100%;background:linear-gradient(180deg,#ff9687,#8c2f28);border-radius:2px 2px 0 0;min-height:2px}
-  .bar-hit{background:linear-gradient(180deg,#ffd1c7,#ff6d59)}
-  .bar-lab{font:10px "Courier New",monospace;color:var(--muted)}
-  code{font:12px "Courier New",monospace;color:var(--accent-hot)}
+  .bar-track{flex:1;width:100%;display:flex;align-items:flex-end;background:var(--s2);border-radius:5px;overflow:hidden}
+  .bar-fill{width:100%;background:linear-gradient(180deg,#8a45f5,#3d1f77);border-radius:5px 5px 0 0;min-height:2px}
+  .bar-hit{background:linear-gradient(180deg,var(--lav),var(--accent))}
+  .bar-lab{font:10px ui-monospace,"Courier New",monospace;color:var(--muted)}
+  code{font:12px ui-monospace,"Courier New",monospace;color:var(--lav)}
 
-  @keyframes spin{to{transform:rotate(360deg)}}
-  @media (prefers-reduced-motion:reduce){.reactor .orbit{animation:none!important}}
+  /* The OS setting is the default; the header control can override it either
+     way, and does so by toggling .still on <html>. */
+  @media (prefers-reduced-motion:reduce){
+    html:not(.moving) .spin-a,html:not(.moving) .spin-b,html:not(.moving) .spin-c{animation:none}
+    html:not(.moving) *{transition-duration:0s!important}
+  }
 
-  /* ---- Mobile: rail becomes a top scroller, matching the reference ---- */
-  @media (max-width:820px){
-    aside{position:static;width:auto;padding:14px 16px;border-right:0;border-bottom:1px solid var(--line);flex-direction:row;align-items:center;gap:14px}
+  /* ---- Tablet / mobile: the rail becomes a top scroller ---- */
+  @media (max-width:900px){
+    aside{position:static;width:auto;padding:12px 16px;border-right:0;border-bottom:1px solid var(--rim);
+      flex-direction:row;align-items:center;gap:14px}
     .brand .sub,.side-bottom,aside .eyebrow{display:none}
-    nav{grid-auto-flow:column;grid-template-columns:none;overflow:auto;margin:0;gap:6px}
-    nav button{white-space:nowrap;padding:8px 10px}
-    nav button .ic{display:none}
-    main{margin-left:0;padding:0 16px 48px}
+    nav{grid-auto-flow:column;grid-template-columns:none;overflow:auto;margin:0;gap:4px;scrollbar-width:none}
+    nav::-webkit-scrollbar{display:none}
+    nav button{white-space:nowrap;padding:8px 12px}
+    main{margin-left:0;padding:0 16px 52px}
     .cols-2{grid-template-columns:1fr}
     .actions{grid-template-columns:repeat(2,1fr)}
-    .hero{flex-direction:column;align-items:flex-start}
+    .hero{flex-direction:column;align-items:flex-start;padding:22px}
     .hero-copy{max-width:100%}
-    .page-heading{flex-direction:column;align-items:flex-start}
-    .command-button{width:100%;justify-content:center}
+    .page-heading{flex-direction:column;align-items:stretch}
+    .launcher{width:100%}
+    .section-title .tabs{flex:1 0 100%}
+    .tabs button{flex:1;text-align:center;padding:7px 10px}
+  }
+  /* Planner done-toggle: a real checkbox-shaped control rather than a
+     character, so it keeps its size whether or not it is ticked. */
+  .check-box{padding:5px;display:flex;border-radius:7px;flex:none}
+  .check-box:not(.on) .i{opacity:.22}
+  .icon-btn .i{width:14px;height:14px}
+  .launcher-list .txt{min-width:0;flex:1}
+
+  @media (max-width:560px){
+    .actions{grid-template-columns:1fr}
+    h1{font-size:27px}
+    .hero h2{font-size:25px}
+    .core-wrap{width:150px;height:150px;align-self:center}
+    .rings{gap:14px;justify-content:center}
+    /* On a phone the four tab labels only fit without their counts, and a
+       label you can read beats a tally you can't. */
+    .tabs{padding:3px}
+    .tabs button{padding:7px 4px;font-size:12.5px}
+    .tabs .count{display:none}
   }
 </style>
 </head>
 <body>
+<a class="skip" href="#main">Skip to content</a>
 <aside>
-  <a class="brand" href="#" onclick="return false"><span class="brand-mark">◈</span><span>CHASTON<span class="sub">PERSONAL OS / 01</span></span></a>
-  <p class="eyebrow" style="margin:26px 0 0">Workspace</p>
+  <span class="brand"><span class="brand-mark" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="m12 2.5 8.2 4.75v9.5L12 21.5 3.8 16.75v-9.5Z"/><circle cx="12" cy="12" r="2.6"/></svg></span><span>CHASTON<span class="sub">PERSONAL OS / 01</span></span></span>
+  <p class="eyebrow" style="margin:24px 0 0">Workspace</p>
   <nav id="navigation" aria-label="Sections"></nav>
   <div class="side-bottom"><span class="status-dot"></span>LOCAL · ON DEVICE<br /><span style="font-family:'Segoe UI'">Your day. In command.</span></div>
 </aside>
 
-<main>
+<main id="main">
   <header>
-    <div class="breadcrumb">WORKSPACE <span>/</span> <strong id="crumb">COMMAND</strong></div>
-    <div class="header-right"><time id="clock"></time><span class="avatar">C</span></div>
+    <div class="breadcrumb">WORKSPACE <span class="sep" aria-hidden="true">/</span> <strong id="crumb">COMMAND</strong></div>
+    <div class="header-right">
+      <button id="motion-toggle" class="icon-btn" aria-pressed="false"><span id="motion-icon" aria-hidden="true"></span><span id="motion-label">MOTION</span></button>
+      <time id="clock"></time>
+      <span class="avatar" aria-hidden="true">C</span>
+    </div>
   </header>
 
   <section class="page-heading">
@@ -212,7 +363,18 @@
       <h1 id="title">Command center<span>.</span></h1>
       <p class="lead" id="subtitle">A clear view of what comes next.</p>
     </div>
-    <button id="command-button" class="command-button">⌕ <span>Find an action</span> <kbd>Ctrl K</kbd></button>
+
+    <!-- Integrated action-search launcher: always on screen, on every view. -->
+    <div class="launcher">
+      <label class="sr-only" for="launcher-input">Search actions and sections</label>
+      <div class="launcher-box">
+        <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.6 4.6"/></svg>
+        <input id="launcher-input" type="text" autocomplete="off" placeholder="Search actions and sections…"
+               role="combobox" aria-expanded="false" aria-controls="launcher-list" aria-autocomplete="list" />
+        <kbd>Ctrl K</kbd>
+      </div>
+      <ul id="launcher-list" class="launcher-list" role="listbox" aria-label="Matching actions" hidden></ul>
+    </div>
   </section>
 
   <!-- Views are populated by JS; only one is shown at a time. -->
@@ -224,9 +386,9 @@
 </main>
 
 <!-- Capture dialog: add an entry to any list-based section -->
-<dialog id="entry-dialog">
+<dialog id="entry-dialog" aria-labelledby="entry-title">
   <form id="entry-form" method="dialog">
-    <div class="dialog-top"><h2 id="entry-title">Add</h2><button type="button" class="close" data-close aria-label="Close">×</button></div>
+    <div class="dialog-top"><h2 id="entry-title">Add</h2><button type="button" class="close" data-close aria-label="Close"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
     <div id="entry-fields"></div>
     <div class="dialog-actions">
       <button type="button" class="btn" data-close>Cancel</button>
@@ -235,16 +397,9 @@
   </form>
 </dialog>
 
-<!-- Command palette -->
-<dialog id="search-dialog">
-  <div class="dialog-top"><h2>Find an action</h2><button type="button" class="close" data-close aria-label="Close">×</button></div>
-  <input id="search" type="text" placeholder="Search actions and sections…" autocomplete="off" />
-  <div id="search-results"></div>
-</dialog>
-
 <!-- Obsidian import -->
-<dialog id="obsidian-dialog">
-  <div class="dialog-top"><h2>Import from Obsidian</h2><button type="button" class="close" data-close aria-label="Close">×</button></div>
+<dialog id="obsidian-dialog" aria-labelledby="obsidian-title">
+  <div class="dialog-top"><h2 id="obsidian-title">Import from Obsidian</h2><button type="button" class="close" data-close aria-label="Close"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
   <p class="muted" style="font-size:13px;margin:10px 0 0">Paste daily notes. Reads weigh-ins, lifts and food. Nothing is saved until you press Import.</p>
   <textarea id="obsidian-text" placeholder="--- \ndate: 2026-09-07\nweight: 184\n---\n## Training\nBench Press 185x8, 185x8\n## Food\nOats 350 cal, 12g protein"></textarea>
   <div id="obsidian-preview"></div>
@@ -254,7 +409,7 @@
   </div>
 </dialog>
 
-<div id="toast" hidden></div>
+<div id="toast" role="status" aria-live="polite" hidden></div>
 
 <script>
 "use strict";
@@ -270,6 +425,62 @@ const todayKey = (d=new Date())=>`${d.getFullYear()}-${String(d.getMonth()+1).pa
 const uid = ()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 const esc = s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const $ = s=>document.querySelector(s);
+
+// ============================================================================
+// LINE ICONS — one consistent set, drawn on the same 24x24 grid at the same
+// stroke weight, inheriting colour from whatever contains them. Replaces the
+// mixed bag of Unicode glyphs ("$", "＋", "✎") that never lined up with each
+// other.
+// ============================================================================
+const ICONS = {
+  command:  '<path d="m12 2.5 8.2 4.75v9.5L12 21.5 3.8 16.75v-9.5Z"/><circle cx="12" cy="12" r="2.6"/>',
+  fitness:  '<path d="M4.5 9.5v5M7.5 7v10M16.5 7v10M19.5 9.5v5M7.5 12h9"/>',
+  steps:    '<path d="M3 20h4.5v-4.5H12V11h4.5V6.5H21"/>',
+  food:     '<path d="M12 8.2C11 6.1 9 5 7.2 5.9 5.1 6.9 4.3 9.7 5.3 12.9c.9 3 2.9 6.1 4.6 6.1.8 0 1.3-.4 2.1-.4s1.3.4 2.1.4c1.7 0 3.7-3.1 4.6-6.1 1-3.2.2-6-1.9-7C15 5 13 6.1 12 8.2Z"/><path d="M12 8.2V5.4c0-1.2 1-2.2 2.2-2.2"/>',
+  planner:  '<path d="M10 6h10M10 12h10M10 18h10"/><path d="m4 6 1.2 1.2 2.4-2.6M4 12l1.2 1.2 2.4-2.6M4 18l1.2 1.2 2.4-2.6"/>',
+  calendar: '<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8.5 3v4M15.5 3v4"/>',
+  journal:  '<path d="M6.5 3H18a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H6.5A2.5 2.5 0 0 1 4 18.5v-13A2.5 2.5 0 0 1 6.5 3Z"/><path d="M8.5 3v18M11.5 8h4.5M11.5 12h4.5"/>',
+  reselling:'<path d="M20.6 13.4 13 21a1.4 1.4 0 0 1-2 0l-8-8V4.4A1.4 1.4 0 0 1 4.4 3H13l7.6 7.6a2 2 0 0 1 0 2.8Z"/><circle cx="7.6" cy="7.6" r="1.3"/>',
+  money:    '<path d="M3.5 8V6.5A1.5 1.5 0 0 1 5 5h11.5v3"/><rect x="3.5" y="8" width="17" height="11.5" rx="2"/><circle cx="16.5" cy="13.8" r="1.3"/>',
+  scan:     '<path d="M4 8.5V6a2 2 0 0 1 2-2h2.5M15.5 4H18a2 2 0 0 1 2 2v2.5M20 15.5V18a2 2 0 0 1-2 2h-2.5M8.5 20H6a2 2 0 0 1-2-2v-2.5"/><path d="M4 12h16"/>',
+  session:  '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.4"/><circle cx="12" cy="12" r=".9"/>',
+  weight:   '<path d="M4 17.5a8 8 0 1 1 16 0"/><path d="M3.2 17.5h17.6"/><path d="m12 17.5 3.4-4.8"/><circle cx="12" cy="17.5" r="1.1"/>',
+  pen:      '<path d="M4 20.2h4L19.6 8.6a2.7 2.7 0 0 0-3.8-3.8L4.2 16.4Z"/><path d="m14.6 6 3.8 3.8"/>',
+  plus:     '<path d="M12 5.5v13M5.5 12h13"/>',
+  dollar:   '<path d="M12 3v18"/><path d="M16.4 7.6c0-1.8-2-2.9-4.4-2.9S7.6 5.8 7.6 7.6s2 2.9 4.4 3.4 4.4 1.6 4.4 3.4-2 2.9-4.4 2.9-4.4-1.1-4.4-2.9"/>',
+  arrow:    '<path d="M7 17 17 7M9.5 7H17v7.5"/>',
+  check:    '<path d="m5 12.6 4.6 4.6L19 7"/>',
+  play:     '<path d="M8 5.4 18.2 12 8 18.6Z"/>',
+  pause:    '<path d="M9 5.5v13M15 5.5v13"/>',
+  x:        '<path d="M6 6l12 12M18 6 6 18"/>',
+};
+const icon = (name, cls="i")=>`<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${ICONS[name]||""}</svg>`;
+
+// ============================================================================
+// MOTION — the orbital core is decoration, so it defaults to whatever the OS
+// asks for and can be overridden either way from the header. Three states:
+// "auto" (follow the OS), "on", "off". The choice is remembered.
+// ============================================================================
+const reduceQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+function motionOn(){
+  const pref = DB.get("motion","auto");
+  if(pref==="on") return true;
+  if(pref==="off") return false;
+  return !reduceQuery.matches;
+}
+function applyMotion(){
+  const on = motionOn();
+  const html = document.documentElement;
+  html.classList.toggle("still", !on);
+  html.classList.toggle("moving", on);
+  const b = $("#motion-toggle");
+  b.setAttribute("aria-pressed", String(on));
+  const verb = on ? "Pause" : "Play";
+  b.setAttribute("aria-label", verb+" background animation");
+  b.title = verb+" background animation";
+  $("#motion-icon").innerHTML = icon(on ? "pause" : "play");
+  $("#motion-label").textContent = on ? "PAUSE" : "PLAY";
+}
 
 // ---- Targets (editable on the Food screen) ----
 const DEFAULT_TARGETS = { calories:2200, protein:200, carbs:220, fat:70 };
@@ -518,23 +729,31 @@ const OB = (()=>{
 // NAV + VIEW ROUTING
 // ============================================================================
 const MODULES = [
-  {id:"Command", ic:"◈"},{id:"Fitness", ic:"⌁"},{id:"Steps", ic:"⇡"},{id:"Food", ic:"◉"},{id:"Planner", ic:"☷"},
-  {id:"Calendar", ic:"▦"},{id:"Journal", ic:"▤"},{id:"Reselling", ic:"⬡"},{id:"Money", ic:"$"},
+  {id:"Command", ic:"command"},{id:"Fitness", ic:"fitness"},{id:"Steps", ic:"steps"},{id:"Food", ic:"food"},
+  {id:"Planner", ic:"planner"},{id:"Calendar", ic:"calendar"},{id:"Journal", ic:"journal"},
+  {id:"Reselling", ic:"reselling"},{id:"Money", ic:"money"},
 ];
-// Quick actions. New Quote (Quotes) and Review QR (Reviews) were removed at
-// the owner's request, along with the CD Lawn Care branding.
+// Quick actions, grouped for the All / Personal / Planning / Business tabs.
+// "All" is not a group anyone belongs to — it is the unfiltered list — so it
+// leads the tab order and every action carries one of the other three.
+//
+// New Quote (Quotes) and Review QR (Reviews) were removed at the owner's
+// request, along with the CD Lawn Care branding. Scan Food stays: it is the
+// one capture action, and it says plainly that the camera side isn't wired
+// up in this build rather than pretending to scan.
+const GROUPS = ["All","Personal","Planning","Business"];
 const ACTIONS = [
-  {label:"Add Food", module:"Food", icon:"◉", tag:"Nutrition"},
-  {label:"Scan Food", module:"Food", icon:"⌗", tag:"Capture"},
-  {label:"Log Lift", module:"Fitness", icon:"▤", tag:"Training"},
-  {label:"Log Session", module:"Fitness", icon:"◎", tag:"Mat · plyo · conditioning"},
-  {label:"Log Weight", module:"Fitness", icon:"◑", tag:"Body"},
-  {label:"Log Steps", module:"Steps", icon:"⇡", tag:"Movement"},
-  {label:"Add Event", module:"Calendar", icon:"▦", tag:"Schedule"},
-  {label:"Journal", module:"Journal", icon:"✎", tag:"Reflection"},
-  {label:"Log Sale", module:"Reselling", icon:"⬡", tag:"Business"},
-  {label:"Add Expense", module:"Money", icon:"$", tag:"Finances"},
-  {label:"Add Task", module:"Planner", icon:"＋", tag:"Planning"},
+  {label:"Add Food",    module:"Food",      icon:"food",      group:"Personal", desc:"Log a meal by hand"},
+  {label:"Scan Food",   module:"Food",      icon:"scan",      group:"Personal", desc:"Barcode capture"},
+  {label:"Log Lift",    module:"Fitness",   icon:"fitness",   group:"Personal", desc:"Exercise and sets"},
+  {label:"Log Session", module:"Fitness",   icon:"session",   group:"Personal", desc:"Mat, plyo or conditioning"},
+  {label:"Log Weight",  module:"Fitness",   icon:"weight",    group:"Personal", desc:"One number, once a day"},
+  {label:"Log Steps",   module:"Steps",     icon:"steps",     group:"Personal", desc:"Today against your goal"},
+  {label:"Journal",     module:"Journal",   icon:"pen",       group:"Personal", desc:"Write the day down"},
+  {label:"Add Task",    module:"Planner",   icon:"plus",      group:"Planning", desc:"Something to get done"},
+  {label:"Add Event",   module:"Calendar",  icon:"calendar",  group:"Planning", desc:"Put it on the schedule"},
+  {label:"Log Sale",    module:"Reselling", icon:"reselling", group:"Business", desc:"Record what sold"},
+  {label:"Add Expense", module:"Money",     icon:"dollar",    group:"Business", desc:"Money going out"},
 ];
 // List-based sections use a shared entry store keyed by module.
 const GENERIC = {
@@ -547,7 +766,8 @@ const GENERIC = {
 let current = "Command";
 
 const nav = $("#navigation");
-MODULES.forEach(m=>{ const b=document.createElement("button"); b.dataset.module=m.id; b.innerHTML=`<span class="ic">${m.ic}</span>${m.id}`; b.onclick=()=>show(m.id); nav.append(b); });
+MODULES.forEach(m=>{ const b=document.createElement("button"); b.type="button"; b.dataset.module=m.id;
+  b.innerHTML=`${icon(m.ic)}<span>${m.id}</span>`; b.onclick=()=>show(m.id); nav.append(b); });
 
 function show(name){
   current = name;
@@ -582,11 +802,12 @@ function ring(value, target, label, unit){
   const pct = target>0 ? Math.min(1, value/target) : 0;
   const r=52, c=2*Math.PI*r, off=c*(1-pct);
   const fmt=n=>Math.round(n)>=10000?Math.round(n).toLocaleString():String(Math.round(n));
-  return `<div class="ring"><svg width="118" height="118" viewBox="0 0 118 118">
-    <circle cx="59" cy="59" r="${r}" fill="none" stroke="#2a1a1b" stroke-width="7"/>
+  return `<div class="ring" role="img" aria-label="${esc(label)}: ${fmt(value)} of ${fmt(target)}${esc(unit||"")}">
+    <svg width="118" height="118" viewBox="0 0 118 118" aria-hidden="true" focusable="false">
+    <circle cx="59" cy="59" r="${r}" fill="none" stroke="rgba(155,92,255,.16)" stroke-width="7"/>
     <circle cx="59" cy="59" r="${r}" fill="none" stroke="var(--accent)" stroke-width="7" stroke-linecap="round"
       stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}"/>
-  </svg><div class="val"><b>${fmt(value)}</b><small>${label}<br/>/${fmt(target)}${unit||""}</small></div></div>`;
+  </svg><div class="val" aria-hidden="true"><b>${fmt(value)}</b><small>${label}<br/>/${fmt(target)}${unit||""}</small></div></div>`;
 }
 
 /** Small inline trend line. Returns "" when there is not enough to plot. */
@@ -595,7 +816,7 @@ function sparkline(trendSeries){
   const vals=pts.map(p=>p.trend); const min=Math.min(...vals), max=Math.max(...vals);
   const span=(max-min)||1, W=280, H=52;
   const d=pts.map((p,i)=>`${i?"L":"M"}${(i/(pts.length-1)*W).toFixed(1)},${(H-((p.trend-min)/span)*H).toFixed(1)}`).join(" ");
-  return `<svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="margin-top:12px;overflow:visible">
+  return `<svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true" focusable="false" style="margin-top:12px;overflow:visible">
     <path d="${d}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
 }
 
@@ -615,15 +836,15 @@ function renderCommand(){
         <h2>Good ${greeting()}, <span>Chaston</span>.</h2>
         <p>${esc(coach[0][0])}</p>
       </div>
-      <div class="reactor" aria-hidden="true">
-        <div class="orbit o1"></div><div class="orbit o2"></div><div class="orbit o3"></div>
-        <div class="core"><b>${proteinLeft}</b><small>G PROTEIN</small></div>
-      </div>
+      ${orbitalCore(proteinLeft, "G PROTEIN", `${proteinLeft} grams of protein left today`)}
     </div>
 
     <div class="panel">
-      <div class="section-title"><h2>Quick actions</h2><span class="tag">TAP TO LOG</span></div>
-      <div class="actions" id="actions"></div>
+      <div class="section-title">
+        <h2 id="qa-heading">Quick actions</h2>
+        <div class="tabs" id="qa-tabs" role="tablist" aria-labelledby="qa-heading"></div>
+      </div>
+      <div class="actions" id="actions" role="tabpanel" tabindex="0"></div>
     </div>
 
     <div class="grid cols-2">
@@ -646,12 +867,84 @@ function renderCommand(){
       ${tasks.length ? tasks.map(e=>`<div class="entry"><div class="body"><strong>${esc(e.title)}</strong>${e.notes?`<p>${esc(e.notes)}</p>`:""}</div></div>`).join("") : `<p class="empty">No open tasks. Add one from Planner.</p>`}
     </div>`;
 
-  const box=$("#actions");
-  ACTIONS.forEach(a=>{ const b=document.createElement("button"); b.className="action";
-    b.innerHTML=`<span class="icon">${a.icon}</span><span><strong>${esc(a.label)}</strong><small>${esc(a.tag)}</small></span><span class="arrow">↗</span>`;
-    b.onclick=()=>runAction(a); box.append(b); });
+  renderActions();
 }
 const greeting=()=>{ const h=new Date().getHours(); return h<12?"morning":h<17?"afternoon":"evening"; };
+
+/**
+ * The slow decorative orbital core. It is decoration, not a sensor reading —
+ * the only real number in it is the one passed in, which is also spelled out
+ * for screen readers. Rings use pathLength="360" so the dash patterns divide
+ * evenly whatever the radius, and each spinning ring is its own <g> because
+ * CSS rotation needs a fill-box origin to turn about its own centre.
+ */
+function orbitalCore(value, label, description){
+  return `<div class="core-wrap">
+    <svg viewBox="0 0 200 200" aria-hidden="true" focusable="false">
+      <defs><radialGradient id="core-glow" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stop-color="#9b5cff" stop-opacity=".50"/>
+        <stop offset="55%" stop-color="#9b5cff" stop-opacity=".10"/>
+        <stop offset="100%" stop-color="#9b5cff" stop-opacity="0"/>
+      </radialGradient></defs>
+      <circle cx="100" cy="100" r="66" fill="url(#core-glow)"/>
+      <g class="spin-a"><circle cx="100" cy="100" r="94" pathLength="360" fill="none"
+        stroke="#9b5cff" stroke-opacity=".40" stroke-width="1" stroke-dasharray="1 4"/></g>
+      <g class="spin-b"><circle cx="100" cy="100" r="84" pathLength="360" fill="none"
+        stroke="#9b5cff" stroke-opacity=".55" stroke-width="6" stroke-dasharray="1.5 10.5"/></g>
+      <g class="spin-c"><circle cx="100" cy="100" r="70" pathLength="360" fill="none" stroke-linecap="round"
+        stroke="#9b5cff" stroke-opacity=".80" stroke-width="2" stroke-dasharray="72 108"/></g>
+      <circle cx="100" cy="100" r="54" fill="none" stroke="#e8dfff" stroke-opacity=".40" stroke-width="1"/>
+      <circle cx="100" cy="100" r="43" fill="none" stroke="#9b5cff" stroke-opacity=".26" stroke-width="1"/>
+      <path d="M4 100h20M176 100h20M100 4v20M100 176v20" stroke="#9b5cff" stroke-opacity=".26" stroke-width="1"/>
+    </svg>
+    <div class="core-read">
+      <b aria-hidden="true">${esc(value)}</b><small aria-hidden="true">${esc(label)}</small>
+      <span class="sr-only">${esc(description)}</span>
+    </div>
+  </div>`;
+}
+
+// ---- Quick actions: All / Personal / Planning / Business ----
+//
+// A real tablist: one tab in the page tab order, arrows move between them,
+// and the panel is labelled by whichever tab is selected. The chosen tab is
+// remembered, so the group you actually use is the one you land on.
+let actionGroup = GROUPS.includes(DB.get("actionTab","All")) ? DB.get("actionTab","All") : "All";
+
+function renderActions(){
+  const tabs=$("#qa-tabs"), box=$("#actions");
+  if(!tabs||!box) return;
+  tabs.innerHTML=""; box.innerHTML="";
+  GROUPS.forEach(g=>{
+    const n = g==="All" ? ACTIONS.length : ACTIONS.filter(a=>a.group===g).length;
+    const b=document.createElement("button");
+    b.type="button"; b.id="qa-tab-"+g;
+    b.setAttribute("role","tab");
+    b.setAttribute("aria-controls","actions");
+    b.setAttribute("aria-selected", String(g===actionGroup));
+    b.tabIndex = g===actionGroup ? 0 : -1;
+    b.innerHTML=`${esc(g)}<span class="count">${n}</span>`;
+    b.onclick=()=>pickGroup(g);
+    b.onkeydown=e=>{
+      const i=GROUPS.indexOf(g); let j=null;
+      if(e.key==="ArrowRight"||e.key==="ArrowDown") j=(i+1)%GROUPS.length;
+      else if(e.key==="ArrowLeft"||e.key==="ArrowUp") j=(i-1+GROUPS.length)%GROUPS.length;
+      else if(e.key==="Home") j=0;
+      else if(e.key==="End") j=GROUPS.length-1;
+      if(j===null) return;
+      e.preventDefault(); pickGroup(GROUPS[j]); $("#qa-tab-"+GROUPS[j]).focus();
+    };
+    tabs.append(b);
+  });
+  box.setAttribute("aria-labelledby","qa-tab-"+actionGroup);
+  const list = actionGroup==="All" ? ACTIONS : ACTIONS.filter(a=>a.group===actionGroup);
+  list.forEach(a=>{
+    const b=document.createElement("button"); b.type="button"; b.className="action";
+    b.innerHTML=`${icon(a.icon)}<span class="txt"><strong>${esc(a.label)}</strong><small>${esc(a.desc)}</small></span>${icon("arrow","i arrow")}`;
+    b.onclick=()=>runAction(a); box.append(b);
+  });
+}
+function pickGroup(g){ actionGroup=g; DB.set("actionTab",g); renderActions(); }
 
 function runAction(a){
   if(a.label==="Add Food"||a.label==="Scan Food"){ show("Food"); openFood(a.label==="Scan Food"); return; }
@@ -765,7 +1058,7 @@ function renderFood(){
       <div class="section-title"><h2>Logged today</h2></div>
       <div>${foods.length ? foods.map((f,i)=>`<div class="entry"><div class="body"><strong>${esc(f.name)}</strong>
         <small>${Math.round(f.calories)} cal · ${Math.round(f.protein)}p ${Math.round(f.carbs)}c ${Math.round(f.fat)}f</small></div>
-        <button class="del" data-food="${i}" aria-label="Remove">×</button></div>`).join("") : `<p class="empty">Nothing logged today.</p>`}</div>
+        <button type="button" class="del" data-food="${i}" aria-label="Remove ${esc(f.name)}">${icon("x")}</button></div>`).join("") : `<p class="empty">Nothing logged today.</p>`}</div>
     </div>`;
   $("#food-add").onclick=()=>openFood(false);
   $("#food-obsidian").onclick=openObsidian;
@@ -834,7 +1127,7 @@ function renderSteps(){
         return all.length ? all.map(k=>`<div class="entry"><div class="body">
           <strong>${(+getSteps()[k]).toLocaleString()} steps</strong>
           <small>${esc(new Date(k+"T12:00:00").toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"}))}${(+getSteps()[k])>=goal?" · goal hit":""}</small>
-          </div><button class="del" data-stepdel="${esc(k)}" aria-label="Remove">×</button></div>`).join("")
+          </div><button type="button" class="del" data-stepdel="${esc(k)}" aria-label="Remove steps for ${esc(k)}">${icon("x")}</button></div>`).join("")
         : `<p class="empty">No steps logged yet.</p>`; })()}</div>
     </div>`;
 
@@ -876,10 +1169,10 @@ function renderGeneric(name){
       <div class="section-title"><h2>${esc(name)}</h2><button class="primary" id="gen-add">Add ${esc(g.noun.toLowerCase())}</button></div>
       ${isMoney?`<p class="big">$${sum.toLocaleString()}</p><p class="muted" style="margin:0 0 10px">${list.length} ${g.noun.toLowerCase()}${list.length===1?"":"s"} logged</p>`:""}
       <div>${list.length ? list.map(e=>`<div class="entry">
-        ${name==="Planner"?`<button class="chip${e.done?' on':''}" style="width:26px;padding:4px 0;text-align:center" data-toggle="${e.id}">${e.done?"✓":""}</button>`:""}
+        ${name==="Planner"?`<button type="button" class="chip check-box${e.done?' on':''}" data-toggle="${e.id}" aria-pressed="${!!e.done}" aria-label="Mark ${esc(e.title)} done">${icon("check")}</button>`:""}
         <div class="body"><strong style="${e.done?'text-decoration:line-through;color:var(--muted)':''}">${esc(e.title)}${e.amount?` · $${esc(e.amount)}`:""}${e.when?` <span class="muted">· ${esc(e.when)}</span>`:""}</strong>
         ${e.notes?`<p>${esc(e.notes)}</p>`:""}</div>
-        <button class="del" data-del="${e.id}" aria-label="Delete">×</button></div>`).join("") : `<p class="empty">Nothing here yet.</p>`}</div>
+        <button type="button" class="del" data-del="${e.id}" aria-label="Delete ${esc(e.title)}">${icon("x")}</button></div>`).join("") : `<p class="empty">Nothing here yet.</p>`}</div>
     </div>`;
   $("#gen-add").onclick=()=>openEntry(name);
   $("#view-generic").querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{ DB.set(g.store, DB.get(g.store,[]).filter(e=>e.id!==b.dataset.del)); renderGeneric(name); });
@@ -889,8 +1182,16 @@ function renderGeneric(name){
 // ============================================================================
 // DIALOGS
 // ============================================================================
-function openDialog(d){ d.showModal(); }
+// A dialog hands focus back to whatever opened it on close, so keyboard use
+// doesn't dump you at the top of the document. <dialog>.showModal() already
+// traps focus and closes on Escape.
+let lastFocus=null;
+function openDialog(d){ lastFocus=document.activeElement; d.showModal(); }
 document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>b.closest("dialog").close());
+document.querySelectorAll("dialog").forEach(d=>d.addEventListener("close",()=>{
+  try{ lastFocus?.focus?.(); }catch(e){}
+}));
+const anyDialogOpen = ()=>!!document.querySelector("dialog[open]");
 
 // Generic entry
 function openEntry(module){
@@ -1006,18 +1307,82 @@ $("#obsidian-import").onclick=()=>{
   show(current);
 };
 
-// Command palette
-function paletteResults(){
-  const q=$("#search").value.toLowerCase(); const box=$("#search-results"); box.innerHTML="";
-  const items=[...ACTIONS.map(a=>({label:a.label,tag:a.tag,run:()=>{$("#search-dialog").close();runAction(a);}})),
-    ...MODULES.map(m=>({label:"Go to "+m.id,tag:"Section",run:()=>{$("#search-dialog").close();show(m.id);}}))];
-  const hits=items.filter(i=>(i.label+" "+i.tag).toLowerCase().includes(q));
-  if(!hits.length){ box.innerHTML=`<p class="empty">No matches.</p>`; return; }
-  hits.forEach(i=>{ const b=document.createElement("button"); b.className="action"; b.innerHTML=`<span><strong>${esc(i.label)}</strong><small>${esc(i.tag)}</small></span><span class="arrow">↗</span>`; b.onclick=i.run; box.append(b); });
+// ============================================================================
+// ACTION-SEARCH LAUNCHER
+//
+// Built into the page header rather than hidden behind a modal: it is on
+// screen on every view, and Ctrl/Cmd-K only moves focus into it. Standard
+// combobox keyboard model — type to filter, Up/Down through the matches,
+// Enter to run, Escape to dismiss.
+// ============================================================================
+const launcher=$("#launcher-input"), lList=$("#launcher-list");
+let lHits=[], lActive=-1;
+
+const launcherItems = ()=>[
+  ...ACTIONS.map(a=>({label:a.label, sub:a.desc, ic:a.icon, run:()=>runAction(a)})),
+  ...MODULES.map(m=>({label:"Go to "+m.id, sub:"Section", ic:m.ic, run:()=>show(m.id)})),
+];
+
+function closeLauncher(){
+  lHits=[]; lActive=-1; lList.hidden=true; lList.innerHTML="";
+  launcher.setAttribute("aria-expanded","false");
+  launcher.removeAttribute("aria-activedescendant");
 }
-$("#command-button").onclick=()=>{ $("#search").value=""; paletteResults(); openDialog($("#search-dialog")); setTimeout(()=>$("#search").focus(),40); };
-$("#search").oninput=paletteResults;
-document.addEventListener("keydown",e=>{ if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="k"){ e.preventDefault(); if(!$("#entry-dialog").open&&!$("#search-dialog").open&&!$("#obsidian-dialog").open) $("#command-button").click(); } });
+
+function markActive(){
+  [...lList.querySelectorAll('li[role="option"]')].forEach((li,n)=>li.setAttribute("aria-selected", String(n===lActive)));
+  if(lActive>=0){ launcher.setAttribute("aria-activedescendant","lopt-"+lActive); lList.children[lActive]?.scrollIntoView({block:"nearest"}); }
+  else launcher.removeAttribute("aria-activedescendant");
+}
+
+function searchLauncher(){
+  const q=launcher.value.trim().toLowerCase();
+  if(!q){ closeLauncher(); return; }
+  lHits=launcherItems().filter(i=>(i.label+" "+i.sub).toLowerCase().includes(q)).slice(0,8);
+  lActive=lHits.length?0:-1;
+  lList.innerHTML = lHits.length
+    ? lHits.map((i,n)=>`<li id="lopt-${n}" role="option" aria-selected="${n===lActive}">${icon(i.ic)}<span class="txt"><span class="lab">${esc(i.label)}</span><span class="sub">${esc(i.sub)}</span></span></li>`).join("")
+    : `<li class="none">No matches.</li>`;
+  lList.hidden=false;
+  launcher.setAttribute("aria-expanded","true");
+  [...lList.querySelectorAll('li[role="option"]')].forEach((li,n)=>{
+    // mousedown, not click: the input must not blur out from under the pick.
+    li.addEventListener("mousedown",e=>{ e.preventDefault(); runLauncher(n); });
+    li.addEventListener("mouseenter",()=>{ lActive=n; markActive(); });
+  });
+  markActive();
+}
+
+function runLauncher(n){
+  const hit=lHits[n]; if(!hit) return;
+  launcher.value=""; closeLauncher(); hit.run();
+}
+
+launcher.addEventListener("input", searchLauncher);
+launcher.addEventListener("focus", ()=>{ if(launcher.value.trim()) searchLauncher(); });
+launcher.addEventListener("blur", ()=>setTimeout(closeLauncher,120));
+launcher.addEventListener("keydown", e=>{
+  if(e.key==="Escape"){ if(!lList.hidden){ e.preventDefault(); closeLauncher(); } else launcher.value=""; return; }
+  if(e.key==="Enter"){ if(lActive>=0){ e.preventDefault(); runLauncher(lActive); } return; }
+  if(e.key!=="ArrowDown" && e.key!=="ArrowUp") return;
+  e.preventDefault();
+  if(lList.hidden){ searchLauncher(); return; }
+  if(!lHits.length) return;
+  lActive = e.key==="ArrowDown" ? (lActive+1)%lHits.length : (lActive-1+lHits.length)%lHits.length;
+  markActive();
+});
+document.addEventListener("keydown",e=>{
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="k" && !anyDialogOpen()){
+    e.preventDefault(); launcher.focus(); launcher.select();
+  }
+});
+
+// ---- Motion control ----
+$("#motion-toggle").onclick=()=>{ DB.set("motion", motionOn()?"off":"on"); applyMotion(); };
+// Following the OS means following it as it changes, but only while the
+// preference is still "auto" — an explicit choice here outranks it.
+reduceQuery.addEventListener?.("change", ()=>{ if(DB.get("motion","auto")==="auto") applyMotion(); });
+applyMotion();
 
 function toast(msg){ const t=$("#toast"); t.textContent=msg; t.hidden=false; clearTimeout(toast._t); toast._t=setTimeout(()=>t.hidden=true,2400); }
 function clock(){ $("#clock").textContent=new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}); }

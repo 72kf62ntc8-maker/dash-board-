@@ -6,13 +6,28 @@ serves `index.html` at `/`). All data is stored locally in the browser under
 `cd_*` keys; nothing leaves the device.
 
 ## Sections
-- **Command** — reactor hero, quick actions, coach signals, daily vitals.
+- **Command** — orbital-core hero, quick actions grouped into All / Personal /
+  Planning / Business tabs, coach signals, daily vitals.
 - **Fitness** — lifts + MMA / mat work, a repeating weekly plan, and a rules
   coach that cross-references training, food and rest. Includes an Obsidian
   importer (paste daily notes → weigh-ins, lifts, food).
 - **Food** — log meals, macros vs. editable targets.
+- **Steps** — daily goal ring, 7-day chart, and an Apple Shortcut recipe that
+  pushes Health's step count in via `?steps=NNNN`.
 - **Planner / Calendar / Journal / Reselling / Money** — quick capture lists.
 
-Design: JARVIS "red command center" — deep black + oxblood, vermilion and
-warm-white instrument accents, an arc-reactor dial, monospace labels;
-respects reduced-motion.
+Every view is keyboard-navigable: `Ctrl`/`Cmd`-`K` jumps to the action-search
+launcher in the header, arrow keys move through the quick-action tabs, and a
+skip link leads the tab order.
+
+## Design
+JARVIS command center, violet build. Four colours do the whole job — near-black
+`#07050D` for the ground, dark violet `#120D20` for panels, electric purple
+`#9B5CFF` as the single accent, lavender `#E8DFFF` for text and hot highlights.
+Depth comes from layering translucent surfaces over that ground with hairline
+violet rims rather than heavy shadows, lit by two soft ambient violet pools.
+
+The only motion is the slow orbital core on Command. It is decorative — not a
+reading of anything — so it follows the OS reduced-motion setting by default,
+and the `PAUSE` / `PLAY` control in the header overrides that either way. The
+choice is remembered.

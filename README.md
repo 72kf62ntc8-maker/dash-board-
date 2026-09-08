@@ -14,8 +14,11 @@ serves `index.html` at `/`). All data is stored locally in the browser under
 - **Food** — a full food log. Meals (Breakfast/Lunch/Dinner/Snacks), a macro
   ring by calorie share, percent-of-goal bars, and the whole nutrition panel
   (20 nutrients, indented sub-rows, derived Net Carbs). Sources: History, My
-  Meals, My Recipes, My Foods and a Basics set of reference staples, all
-  searchable at once. Enter a label once with **Create a food** and logging it
+  Meals, My Recipes, My Foods, a Brands set (~175 flagship items across 19 US
+  chains plus common packaged products) and a Basics set (~127 whole foods by
+  food group), all searchable at once. Search matches terms independently and
+  ignores punctuation, so "chipotle chicken", "chicken chipotle" and
+  "chickfila nuggets" all land. Enter a label once with **Create a food** and logging it
   again is a tap plus a serving count. Also quick add, a voice log that uses
   the browser's own speech recognition, and water with quick-add presets and a
   unit switch. **Carb cycling** is optional: turn it on and a day runs High /
@@ -26,10 +29,21 @@ serves `index.html` at `/`). All data is stored locally in the browser under
 - **Steps** — daily goal ring, 7-day chart, and an Apple Shortcut recipe that
   pushes Health's step count in via `?steps=NNNN`.
 
+Food is split into three screens behind one command bar — **Today**, **Carb
+cycle** and **Nutrition** — so the rotation is one tap rather than a scroll,
+and the bar keeps the day, the day's type and Add food in reach on all three.
+
 Food and Steps carry a day strip: step back through the log to review or fix a
 day you missed, and everything you log there — food, water, steps — lands on
 the day you are looking at. Command and the coach always speak about today.
-- **Planner / Calendar / Journal / Reselling / Money** — quick capture lists.
+- **Planner** — tasks with an optional due date and priority, grouped Overdue /
+  Today / Tomorrow / This week / Later / No date, filtered Open / Done / All.
+- **Calendar** — events with a real date and time, grouped chronologically and
+  filtered Upcoming / Past / All.
+- **Journal / Reselling / Money** — quick capture lists.
+
+Command's **Up next** merges open tasks and scheduled events into one ordered
+list, soonest first, and the coach counts anything overdue.
 
 ## Obsidian
 Paste daily notes into the importer (Fitness → Import Obsidian) and it reads
@@ -44,6 +58,14 @@ duplicate the day.
 Every view is keyboard-navigable: `Ctrl`/`Cmd`-`K` jumps to the action-search
 launcher in the header, arrow keys move through the quick-action tabs, and a
 skip link leads the tab order.
+
+### A note on the reference foods
+Brands and Basics are **reference values, not a live database**: standard
+figures for a plain serving, and chain-published figures for the standard menu
+item. Chains reformulate, portions vary by store, and anything customised
+changes the numbers. Check the ones you eat often against the label or the
+chain's own page — logging one turns it into an entry you own and can correct,
+and the corrected version is what appears in History next time.
 
 ## Design
 JARVIS command center, violet build. Four colours do the whole job — near-black

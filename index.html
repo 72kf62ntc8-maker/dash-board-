@@ -273,6 +273,21 @@
   .coach-good{border-left-color:var(--success);color:#a4e8cc}
   .coach-info{border-left-color:var(--rim-strong);color:var(--muted)}
 
+  /* ---- Food command bar ---- */
+  .foodbar{position:sticky;top:0;z-index:15;padding:14px 16px;
+    background:rgba(16,11,29,.92);backdrop-filter:blur(16px)}
+  .foodbar-top{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  .foodbar .tabs{margin-top:12px}
+  /* Two columns that fold to one: the ring and where you stand beside it. */
+  .split{display:flex;gap:34px;align-items:flex-start;flex-wrap:wrap}
+  .split-a{flex:0 1 auto}
+  .split-b{flex:1 1 300px;min-width:min(300px,100%)}
+  .typepreview{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  .typepreview > div{border:1px solid var(--rim);background:var(--s2);
+    border-radius:var(--radius-sm);padding:14px}
+  .typepreview .g{font-size:22px;font-weight:600;margin-top:6px}
+  .typepreview .n{font-size:12px;color:var(--muted);margin-top:2px}
+
   /* ---- Carb cycle ---- */
   .switch{display:flex;align-items:center;gap:9px;border:1px solid var(--rim);background:var(--s2);
     padding:5px 12px 5px 6px;border-radius:99px;font-size:12px;color:var(--muted);
@@ -309,10 +324,24 @@
     color:var(--lav);text-transform:uppercase;min-width:96px;text-align:center}
 
   /* ---- Food ---- */
-  .meal-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;
+  .meal-head,.group-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;
     padding:14px 0 8px;border-top:1px solid var(--rim)}
-  .meal-head:first-child{border-top:0;padding-top:0}
-  .meal-head h3{font-size:15px;font-weight:600;margin:0}
+  .meal-head:first-child,.group-head:first-child{border-top:0;padding-top:0}
+  .meal-head h3,.group-head h3{font-size:15px;font-weight:600;margin:0}
+  .group-head.late h3{color:var(--danger)}
+
+  /* ---- Planner / Calendar ---- */
+  .due{font:10px ui-monospace,"Courier New",monospace;letter-spacing:1.2px;padding:3px 9px;
+    border-radius:99px;border:1px solid var(--rim);color:var(--muted);white-space:nowrap;flex:none}
+  .due.now{border-color:var(--rim-strong);color:var(--lav);background:var(--tint)}
+  .due.late{border-color:var(--danger);color:#ffb3c4;background:rgba(255,107,138,.13)}
+  /* Priority is a dot, not a colour on the text — it has to survive being read
+     by someone who cannot tell the two apart, so the tooltip names it too. */
+  .prio{width:7px;height:7px;border-radius:50%;flex:none;margin-top:7px}
+  .prio.high{background:var(--warn);box-shadow:0 0 8px var(--warn)}
+  .prio.low{background:var(--faint)}
+  .upnext-ic{color:var(--accent);flex:none;margin-top:1px}
+  .upnext-ic .i{width:16px;height:16px}
   .meal-kcal{font:11px ui-monospace,"Courier New",monospace;letter-spacing:1.2px;color:var(--muted)}
   .macro-row{display:flex;align-items:center;gap:26px;flex-wrap:wrap}
   .donut{position:relative;width:150px;height:150px;flex:none}
@@ -370,7 +399,9 @@
     padding:12px 0;border-top:1px solid var(--rim)}
   .fieldrow > span{font-size:14px}
   .fieldrow input,.fieldrow select{width:auto;min-width:120px;max-width:190px;text-align:right;padding:8px 10px;font-size:14px}
-  .presets{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+  /* Quick-add buttons are targets, not a banner — cap them so they stay a row
+     of buttons rather than stretching across whatever space is going. */
+  .presets{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px;max-width:340px}
   .note{font-size:12.5px;color:var(--muted);margin:10px 0 0;padding-left:11px;border-left:2px solid var(--rim-strong)}
 
   /* ---- Dialogs ---- */
@@ -443,6 +474,11 @@
     .donut{width:130px;height:130px}
     .fieldrow{flex-wrap:wrap}
     .fieldrow input,.fieldrow select{max-width:none;flex:1}
+    .foodbar{padding:12px}
+    .foodbar-top{gap:10px}
+    .foodbar .tabs{margin-top:10px}
+    .typepreview{grid-template-columns:1fr}
+    .split{gap:22px}
     .subtabs{gap:13px}
     .subtabs button{font-size:13.5px}
     .dialog-scroll{max-height:52vh}
@@ -526,13 +562,14 @@
   <label class="sr-only" for="browse-search">Search foods</label>
   <input id="browse-search" type="search" autocomplete="off" placeholder="Search foods, brands, flavors…" />
   <div class="subtabs" id="browse-tabs" role="tablist" aria-label="Food sources"></div>
+  <div class="chip-row" id="browse-cats" hidden style="margin:14px 0 0;max-height:74px;overflow:auto"></div>
   <div class="capture" id="browse-capture"></div>
   <div class="section-title" style="margin:4px 0 8px">
     <h2 id="browse-listname" style="font-size:15px">Recently logged</h2>
     <button type="button" class="ghost" id="browse-sort"></button>
   </div>
+  <p class="note" id="browse-note" hidden style="margin:0 0 10px"></p>
   <div class="picklist" id="browse-list" role="tabpanel"></div>
-  <p class="note" id="browse-note" hidden></p>
 </dialog>
 
 <!-- Food detail: servings, macros, percent of goals, full nutrition facts -->
@@ -837,52 +874,403 @@ function foodHistory(){
   return out;
 }
 
-// A small set of single-ingredient staples so the first search is not empty.
-// These are standard reference values per the serving shown, NOT a branded
-// database — check them against your own label, and edit after logging if
-// your product differs. Anything you log becomes a history entry you own.
-const BASIC_FOODS = [
-  ["Chicken breast, cooked","4 oz",187,35,0,4],
-  ["Ground beef, 93/7, cooked","4 oz",195,29,0,10],
-  ["Ground turkey, 93/7, cooked","4 oz",213,27,0,11],
-  ["Sirloin steak, cooked","4 oz",228,34,0,9],
-  ["Salmon, cooked","4 oz",233,25,0,14],
-  ["Tuna, canned in water","3 oz",99,22,0,0.7],
-  ["Shrimp, cooked","4 oz",112,24,1.4,0.6],
-  ["Egg, large","1 egg",72,6.3,0.4,4.8],
-  ["Egg white, large","1 white",17,3.6,0.2,0.1],
-  ["Whey protein","1 scoop (30g)",120,24,3,1.5],
-  ["Greek yogurt, plain nonfat","1 cup",133,23,9,0.7],
-  ["Cottage cheese, 2%","1 cup",183,24,9,5],
-  ["Milk, whole","1 cup",149,7.7,12,8],
-  ["Milk, skim","1 cup",83,8.3,12,0.2],
-  ["Cheddar cheese","1 oz",114,7,0.4,9.4],
-  ["White rice, cooked","1 cup",205,4.3,45,0.4],
-  ["Brown rice, cooked","1 cup",218,5,46,1.6],
-  ["Quinoa, cooked","1 cup",222,8,39,3.6],
-  ["Pasta, cooked","1 cup",220,8,43,1.3],
-  ["Rolled oats, dry","1/2 cup (40g)",150,5,27,3],
-  ["Bread, whole wheat","1 slice",81,4,14,1.1],
-  ["Tortilla, flour 8in","1 tortilla",144,4,24,3.5],
-  ["Potato, baked with skin","1 medium",161,4.3,37,0.2],
-  ["Sweet potato, baked","1 medium",103,2.3,24,0.2],
-  ["Black beans, cooked","1 cup",227,15,41,0.9],
-  ["Broccoli, cooked","1 cup",55,3.7,11,0.6],
-  ["Spinach, raw","1 cup",7,0.9,1.1,0.1],
-  ["Avocado","1/2 medium",114,1.3,6,10.5],
-  ["Banana","1 medium",105,1.3,27,0.4],
-  ["Apple","1 medium",95,0.5,25,0.3],
-  ["Blueberries","1 cup",84,1.1,21,0.5],
-  ["Orange juice","1 cup",112,1.7,26,0.5],
-  ["Peanut butter","2 tbsp",190,7,7,16],
-  ["Almonds","1 oz",164,6,6,14],
-  ["Olive oil","1 tbsp",119,0,0,13.5],
-  ["Butter","1 tbsp",102,0.1,0,11.5],
-  ["Honey","1 tbsp",64,0,17,0],
-].map(([name,serving,calories,protein,carbs,fat],i)=>({
-  id:"b"+i, name, serving, brand:"Basics", basic:true,
-  per:{calories,protein,carbs,fat},
-}));
+// A reference set so searching for what you actually eat finds something.
+// These are STANDARD REFERENCE VALUES for a plain serving and CHAIN-PUBLISHED
+// figures for the branded items — not a live database. Chains reformulate,
+// portions vary by store, and anything you customise changes the numbers. Check
+// the ones you eat often against the label or the chain's own nutrition page;
+// once you log one it becomes an entry you own and can correct.
+//   [name, serving, calories, protein, carbs, fat]
+const BASIC_ROWS = {
+  "Protein": [
+    ["Chicken breast, cooked","4 oz",187,35,0,4],
+    ["Chicken thigh, cooked","4 oz",240,29,0,13],
+    ["Ground chicken, cooked","4 oz",200,24,0,11],
+    ["Ground beef, 93/7, cooked","4 oz",195,29,0,10],
+    ["Ground beef, 80/20, cooked","4 oz",287,26,0,20],
+    ["Ground turkey, 93/7, cooked","4 oz",213,27,0,11],
+    ["Sirloin steak, cooked","4 oz",228,34,0,9],
+    ["Ribeye steak, cooked","4 oz",310,28,0,22],
+    ["Pork chop, cooked","4 oz",230,32,0,11],
+    ["Bacon","2 slices",80,6,0,6],
+    ["Turkey bacon","2 slices",60,4,1,4],
+    ["Deli turkey breast","2 oz",60,11,2,1],
+    ["Ham, deli","2 oz",70,10,2,2],
+    ["Beef jerky","1 oz",80,11,7,1],
+    ["Salmon, cooked","4 oz",233,25,0,14],
+    ["Tilapia, cooked","4 oz",145,30,0,3],
+    ["Cod, cooked","4 oz",120,26,0,1],
+    ["Tuna, canned in water","3 oz",99,22,0,0.7],
+    ["Salmon, canned","3 oz",120,17,0,5],
+    ["Shrimp, cooked","4 oz",112,24,1.4,0.6],
+    ["Scallops, cooked","4 oz",130,24,6,1],
+    ["Egg, large","1 egg",72,6.3,0.4,4.8],
+    ["Egg white, large","1 white",17,3.6,0.2,0.1],
+    ["Egg whites, carton","1/2 cup",63,13,1,0],
+    ["Tofu, firm","4 oz",90,10,3,5],
+    ["Edamame, shelled","1 cup",190,18,14,8],
+  ],
+  "Dairy": [
+    ["Whey protein","1 scoop (30g)",120,24,3,1.5],
+    ["Greek yogurt, plain nonfat","1 cup",133,23,9,0.7],
+    ["Cottage cheese, 2%","1 cup",183,24,9,5],
+    ["Cottage cheese, 4%","1 cup",220,25,8,10],
+    ["Milk, whole","1 cup",149,7.7,12,8],
+    ["Milk, skim","1 cup",83,8.3,12,0.2],
+    ["Almond milk, unsweetened","1 cup",30,1,1,2.5],
+    ["Oat milk","1 cup",120,3,16,5],
+    ["Soy milk, unsweetened","1 cup",80,7,4,4],
+    ["Cheddar cheese","1 oz",114,7,0.4,9.4],
+    ["Mozzarella, part-skim","1 oz",85,7,1,6],
+    ["Parmesan, grated","1 tbsp",22,2,0.2,1.4],
+    ["Feta cheese","1 oz",75,4,1,6],
+    ["Cream cheese","1 tbsp",50,1,1,5],
+  ],
+  "Carbs": [
+    ["White rice, cooked","1 cup",205,4.3,45,0.4],
+    ["Brown rice, cooked","1 cup",218,5,46,1.6],
+    ["Quinoa, cooked","1 cup",222,8,39,3.6],
+    ["Pasta, cooked","1 cup",220,8,43,1.3],
+    ["Whole wheat pasta, cooked","1 cup",174,7.5,37,0.8],
+    ["Protein pasta, cooked","1 cup",190,14,35,2],
+    ["Couscous, cooked","1 cup",176,6,36,0.3],
+    ["Rolled oats, dry","1/2 cup (40g)",150,5,27,3],
+    ["Cream of rice, dry","1/4 cup",160,3,38,0],
+    ["Bread, whole wheat","1 slice",81,4,14,1.1],
+    ["Bread, white","1 slice",79,2.7,15,1],
+    ["Bagel, plain","1 medium",270,11,53,1.5],
+    ["English muffin","1 muffin",134,5,26,1],
+    ["Pita, whole wheat","1 large",170,6,35,1.7],
+    ["Tortilla, flour 8in","1 tortilla",144,4,24,3.5],
+    ["Tortilla, corn","1 tortilla",52,1.4,11,0.7],
+    ["Potato, baked with skin","1 medium",161,4.3,37,0.2],
+    ["Sweet potato, baked","1 medium",103,2.3,24,0.2],
+    ["Cheerios","1 cup",100,3,20,2],
+    ["Granola","1/2 cup",210,5,36,6],
+    ["Pancake","1 medium",90,2,15,2.5],
+    ["Waffle, frozen","1 waffle",100,2,15,3],
+  ],
+  "Legumes": [
+    ["Black beans, cooked","1 cup",227,15,41,0.9],
+    ["Kidney beans, cooked","1 cup",225,15,40,0.9],
+    ["Chickpeas, cooked","1 cup",269,15,45,4],
+    ["Lentils, cooked","1 cup",230,18,40,0.8],
+    ["Refried beans","1/2 cup",120,7,20,2],
+  ],
+  "Fruit": [
+    ["Banana","1 medium",105,1.3,27,0.4],
+    ["Apple","1 medium",95,0.5,25,0.3],
+    ["Orange","1 medium",62,1.2,15,0.2],
+    ["Blueberries","1 cup",84,1.1,21,0.5],
+    ["Strawberries","1 cup",49,1,12,0.5],
+    ["Grapes","1 cup",104,1.1,27,0.2],
+    ["Pineapple","1 cup",82,0.9,22,0.2],
+    ["Mango","1 cup",99,1.4,25,0.6],
+    ["Watermelon","1 cup",46,0.9,11,0.2],
+    ["Peach","1 medium",59,1.4,14,0.4],
+    ["Pear","1 medium",101,0.6,27,0.2],
+    ["Raisins","1/4 cup",108,1.1,29,0.2],
+    ["Avocado","1/2 medium",114,1.3,6,10.5],
+  ],
+  "Vegetables": [
+    ["Broccoli, cooked","1 cup",55,3.7,11,0.6],
+    ["Spinach, raw","1 cup",7,0.9,1.1,0.1],
+    ["Kale, raw","1 cup",33,2.9,6,0.6],
+    ["Romaine lettuce","1 cup",8,0.6,1.5,0.1],
+    ["Carrots, raw","1 cup",52,1.2,12,0.3],
+    ["Bell pepper","1 medium",24,1,6,0.2],
+    ["Onion","1/2 cup",32,0.9,7,0.1],
+    ["Tomato","1 medium",22,1.1,4.8,0.2],
+    ["Cucumber","1 cup",16,0.7,3.8,0.1],
+    ["Zucchini, cooked","1 cup",27,2,5,0.5],
+    ["Asparagus, cooked","1 cup",40,4.3,7,0.4],
+    ["Green beans, cooked","1 cup",44,2.4,10,0.4],
+    ["Corn","1 cup",143,5,31,2.2],
+    ["Peas, cooked","1 cup",134,8.6,25,0.4],
+    ["Mushrooms, raw","1 cup",15,2.2,2.3,0.2],
+    ["Cauliflower, cooked","1 cup",29,2.3,5,0.6],
+    ["Brussels sprouts, cooked","1 cup",56,4,11,0.8],
+  ],
+  "Fats": [
+    ["Peanut butter","2 tbsp",190,7,7,16],
+    ["Almond butter","2 tbsp",196,7,6,18],
+    ["Almonds","1 oz",164,6,6,14],
+    ["Peanuts","1 oz",161,7,5,14],
+    ["Cashews","1 oz",157,5,9,12],
+    ["Walnuts","1 oz",185,4,4,18],
+    ["Chia seeds","1 tbsp",58,2,5,3.7],
+    ["Ground flaxseed","1 tbsp",37,1.3,2,3],
+    ["Olive oil","1 tbsp",119,0,0,13.5],
+    ["Coconut oil","1 tbsp",121,0,0,13.5],
+    ["Butter","1 tbsp",102,0.1,0,11.5],
+  ],
+  "Condiments": [
+    ["Mayonnaise","1 tbsp",94,0.1,0.1,10],
+    ["Ketchup","1 tbsp",19,0.2,4.7,0],
+    ["Mustard","1 tsp",3,0.2,0.3,0.2],
+    ["BBQ sauce","2 tbsp",70,0,17,0],
+    ["Ranch dressing","2 tbsp",129,0.4,2,13],
+    ["Soy sauce","1 tbsp",9,1,1,0],
+    ["Sriracha","1 tsp",5,0,1,0],
+    ["Hot sauce","1 tsp",1,0,0,0],
+    ["Honey","1 tbsp",64,0,17,0],
+    ["Maple syrup","1 tbsp",52,0,13,0],
+    ["Sugar","1 tsp",16,0,4,0],
+  ],
+  "Drinks": [
+    ["Coffee, black","8 fl oz",2,0.3,0,0],
+    ["Green tea","8 fl oz",2,0,0,0],
+    ["Orange juice","1 cup",112,1.7,26,0.5],
+    ["Gatorade","20 fl oz",140,0,36,0],
+    ["Diet soda","12 fl oz",0,0,0,0],
+    ["Soda, cola","12 fl oz",140,0,39,0],
+    ["Beer, regular","12 fl oz",153,1.6,13,0],
+    ["Wine, red","5 fl oz",125,0.1,4,0],
+  ],
+};
+
+// Chain-published values for flagship US menu items, grouped by where you buy
+// them. Same caveat as above, more strongly: a burger built your way is not
+// the burger on the poster.
+//   [name, serving, calories, protein, carbs, fat]
+const BRAND_ROWS = {
+  "McDonald's": [
+    ["Big Mac","1 burger",563,26,45,33],
+    ["Quarter Pounder with Cheese","1 burger",520,30,42,26],
+    ["Double Quarter Pounder with Cheese","1 burger",740,48,43,43],
+    ["Cheeseburger","1 burger",300,15,32,13],
+    ["Hamburger","1 burger",250,12,31,9],
+    ["McDouble","1 burger",400,22,33,20],
+    ["McChicken","1 sandwich",400,14,39,21],
+    ["Filet-O-Fish","1 sandwich",390,16,39,19],
+    ["Chicken McNuggets, 6 pc","6 pieces",250,14,15,15],
+    ["Chicken McNuggets, 10 pc","10 pieces",410,23,25,24],
+    ["French Fries, medium","1 medium",320,5,43,15],
+    ["French Fries, large","1 large",480,7,64,23],
+    ["Hash Browns","1 piece",140,1,17,8],
+    ["Egg McMuffin","1 sandwich",310,17,30,13],
+    ["Sausage McMuffin with Egg","1 sandwich",480,21,30,31],
+    ["Sausage Burrito","1 burrito",310,13,26,17],
+    ["Hotcakes","3 hotcakes",580,9,102,15],
+    ["Big Breakfast","1 platter",740,25,51,48],
+    ["Vanilla Cone","1 cone",200,5,32,5],
+    ["McFlurry with OREO","1 regular",510,12,80,16],
+  ],
+  "Chick-fil-A": [
+    ["Chicken Sandwich","1 sandwich",440,29,41,19],
+    ["Spicy Chicken Sandwich","1 sandwich",450,29,42,20],
+    ["Deluxe Chicken Sandwich","1 sandwich",490,32,43,23],
+    ["Grilled Chicken Sandwich","1 sandwich",390,28,44,12],
+    ["Nuggets, 8 ct","8 pieces",250,27,11,11],
+    ["Nuggets, 12 ct","12 pieces",380,40,16,17],
+    ["Grilled Nuggets, 8 ct","8 pieces",130,25,1,3],
+    ["Grilled Nuggets, 12 ct","12 pieces",200,38,2,5],
+    ["Chick-n-Strips, 3 ct","3 strips",310,29,14,15],
+    ["Waffle Potato Fries, medium","1 medium",420,5,45,24],
+    ["Mac & Cheese, small","1 small",270,12,24,14],
+    ["Cobb Salad, no dressing","1 salad",510,40,27,27],
+    ["Grilled Chicken Cool Wrap","1 wrap",660,42,47,34],
+  ],
+  "Chipotle": [
+    ["Chicken","4 oz",180,32,0,7],
+    ["Steak","4 oz",150,21,1,6],
+    ["Barbacoa","4 oz",170,24,2,7],
+    ["Carnitas","4 oz",210,23,0,12],
+    ["Sofritas","4 oz",150,8,9,10],
+    ["White Rice","4 oz",210,4,40,4],
+    ["Brown Rice","4 oz",210,4,36,6],
+    ["Black Beans","4 oz",130,8,22,2],
+    ["Pinto Beans","4 oz",130,8,21,2],
+    ["Fajita Veggies","2.5 oz",20,1,5,0],
+    ["Fresh Tomato Salsa","3.5 oz",25,1,4,0],
+    ["Roasted Chili-Corn Salsa","3.5 oz",80,3,16,2],
+    ["Monterey Jack Cheese","1 oz",110,6,1,8],
+    ["Sour Cream","2 oz",110,2,2,9],
+    ["Guacamole","4 oz",230,2,8,22],
+    ["Queso Blanco","2 oz",120,6,4,9],
+    ["Flour Tortilla, burrito","1 tortilla",320,8,50,9],
+    ["Chips","4 oz",540,7,73,25],
+  ],
+  "Taco Bell": [
+    ["Crunchy Taco","1 taco",170,8,13,10],
+    ["Soft Taco, Beef","1 taco",180,9,18,9],
+    ["Doritos Locos Taco, Nacho Cheese","1 taco",170,8,13,10],
+    ["Crunchwrap Supreme","1 item",530,16,71,21],
+    ["Bean Burrito","1 burrito",350,13,54,9],
+    ["Burrito Supreme, Beef","1 burrito",390,16,51,14],
+    ["Chicken Quesadilla","1 quesadilla",510,26,38,28],
+    ["Cheesy Gordita Crunch","1 item",500,20,41,28],
+    ["Chalupa Supreme, Beef","1 item",350,13,30,20],
+    ["Nachos BellGrande","1 order",740,17,82,38],
+    ["Power Menu Bowl, Chicken","1 bowl",470,26,50,19],
+    ["Black Beans and Rice","1 side",170,5,27,4],
+    ["Cinnamon Twists","1 order",170,1,27,6],
+  ],
+  "Subway": [
+    ["6\" Turkey Breast","6 inch",280,18,46,4],
+    ["6\" Oven Roasted Chicken","6 inch",320,25,45,5],
+    ["6\" Rotisserie-Style Chicken","6 inch",350,27,45,7],
+    ["6\" Italian B.M.T.","6 inch",410,20,46,16],
+    ["6\" Meatball Marinara","6 inch",480,21,61,18],
+    ["6\" Tuna","6 inch",480,20,44,25],
+    ["6\" Steak & Cheese","6 inch",380,26,45,10],
+    ["6\" Veggie Delite","6 inch",230,8,44,2],
+    ["Footlong Turkey Breast","12 inch",560,36,92,8],
+    ["Footlong Oven Roasted Chicken","12 inch",640,50,90,10],
+  ],
+  "Wendy's": [
+    ["Dave's Single","1 burger",590,29,39,34],
+    ["Dave's Double","1 burger",810,48,40,51],
+    ["Jr. Bacon Cheeseburger","1 burger",380,19,27,21],
+    ["Spicy Chicken Sandwich","1 sandwich",500,28,50,20],
+    ["Homestyle Chicken Sandwich","1 sandwich",500,28,50,21],
+    ["Grilled Chicken Sandwich","1 sandwich",370,34,37,9],
+    ["Chicken Nuggets, 4 pc","4 pieces",170,9,10,11],
+    ["Chicken Nuggets, 10 pc","10 pieces",420,22,24,26],
+    ["Natural-Cut Fries, medium","1 medium",350,5,47,16],
+    ["Chili, small","1 small",240,18,23,10],
+    ["Baked Potato, plain","1 potato",270,7,61,0],
+    ["Frosty, small chocolate","1 small",350,9,58,9],
+  ],
+  "Burger King": [
+    ["Whopper","1 burger",670,31,51,40],
+    ["Whopper with Cheese","1 burger",760,35,52,47],
+    ["Double Whopper","1 burger",900,48,51,58],
+    ["Cheeseburger","1 burger",280,15,27,13],
+    ["Original Chicken Sandwich","1 sandwich",660,28,51,40],
+    ["Chicken Fries, 9 pc","9 pieces",280,15,21,15],
+    ["French Fries, medium","1 medium",380,4,53,17],
+    ["Croissan'wich, Sausage Egg & Cheese","1 sandwich",500,19,27,35],
+  ],
+  "Starbucks": [
+    ["Caffè Americano, grande","16 fl oz",15,1,3,0],
+    ["Pike Place Roast, grande","16 fl oz",5,1,0,0],
+    ["Cold Brew, grande, black","16 fl oz",5,0,0,0],
+    ["Caffè Latte, grande, 2%","16 fl oz",190,13,19,7],
+    ["Cappuccino, grande, 2%","16 fl oz",140,9,14,5],
+    ["Vanilla Latte, grande, 2%","16 fl oz",250,12,35,6],
+    ["Caramel Macchiato, grande, 2%","16 fl oz",250,10,35,7],
+    ["Caffè Mocha, grande, 2% with whip","16 fl oz",370,14,44,15],
+    ["Java Chip Frappuccino, grande","16 fl oz",440,6,66,18],
+    ["Pumpkin Spice Latte, grande, 2% with whip","16 fl oz",390,14,52,14],
+    ["Bacon, Gouda & Egg Sandwich","1 sandwich",360,18,32,18],
+    ["Spinach, Feta & Egg White Wrap","1 wrap",290,20,34,8],
+    ["Turkey Bacon, Cheddar & Egg White Sandwich","1 sandwich",230,17,28,5],
+    ["Bacon & Gruyère Egg Bites","2 bites",300,19,9,20],
+  ],
+  "Dunkin'": [
+    ["Glazed Donut","1 donut",240,4,29,12],
+    ["Boston Kreme Donut","1 donut",300,4,40,14],
+    ["Iced Coffee, medium, black","24 fl oz",10,0,2,0],
+    ["Sausage, Egg & Cheese Croissant","1 sandwich",700,24,40,49],
+    ["Wake-Up Wrap, Bacon Egg & Cheese","1 wrap",200,10,14,11],
+  ],
+  "Popeyes": [
+    ["Classic Chicken Sandwich","1 sandwich",700,28,50,42],
+    ["Spicy Chicken Sandwich","1 sandwich",700,28,50,42],
+    ["Handcrafted Chicken Tender","1 tender",130,11,8,6],
+    ["Red Beans & Rice, regular","1 regular",230,7,31,9],
+    ["Cajun Fries, regular","1 regular",260,4,33,13],
+    ["Biscuit","1 biscuit",220,3,26,12],
+  ],
+  "KFC": [
+    ["Original Recipe Breast","1 piece",390,39,11,21],
+    ["Original Recipe Thigh","1 piece",280,19,8,19],
+    ["Original Recipe Drumstick","1 piece",130,12,4,8],
+    ["Extra Crispy Breast","1 piece",530,35,20,35],
+    ["Famous Bowl","1 bowl",720,26,80,34],
+    ["Mashed Potatoes with Gravy","1 individual",130,2,20,4],
+    ["Coleslaw","1 individual",170,1,22,9],
+    ["Biscuit","1 biscuit",180,4,22,9],
+  ],
+  "Panda Express": [
+    ["Orange Chicken","1 serving",490,25,51,23],
+    ["Beijing Beef","1 serving",470,14,46,26],
+    ["Broccoli Beef","1 serving",150,9,13,7],
+    ["Kung Pao Chicken","1 serving",290,16,14,19],
+    ["Grilled Teriyaki Chicken","1 serving",300,36,8,13],
+    ["String Bean Chicken Breast","1 serving",190,14,13,9],
+    ["Honey Walnut Shrimp","1 serving",360,13,35,23],
+    ["Chow Mein","1 side",510,13,80,20],
+    ["Fried Rice","1 side",520,11,85,16],
+    ["White Steamed Rice","1 side",380,7,87,0],
+    ["Super Greens","1 side",90,6,10,3],
+    ["Cream Cheese Rangoon","3 pieces",190,5,24,8],
+  ],
+  "In-N-Out": [
+    ["Hamburger with onion","1 burger",390,16,39,19],
+    ["Cheeseburger with onion","1 burger",480,22,39,27],
+    ["Double-Double","1 burger",670,37,39,41],
+    ["Double-Double, Protein Style","1 burger",520,33,11,39],
+    ["French Fries","1 order",370,7,54,15],
+    ["Chocolate Shake","15 fl oz",590,9,83,25],
+  ],
+  "Five Guys": [
+    ["Hamburger","1 burger",700,39,39,43],
+    ["Cheeseburger","1 burger",840,47,40,55],
+    ["Bacon Cheeseburger","1 burger",920,51,40,62],
+    ["Little Hamburger","1 burger",480,23,39,26],
+    ["Fries, regular","1 regular",953,15,131,41],
+    ["Fries, little","1 little",526,8,72,23],
+  ],
+  "Arby's": [
+    ["Classic Roast Beef","1 sandwich",360,23,37,14],
+    ["Beef 'n Cheddar Classic","1 sandwich",450,23,45,20],
+    ["Curly Fries, medium","1 medium",410,5,50,21],
+  ],
+  "Domino's": [
+    ["Hand Tossed Cheese, medium","1 slice",200,8,26,7],
+    ["Hand Tossed Pepperoni, medium","1 slice",220,9,26,9],
+  ],
+  "Pizza Hut": [
+    ["Pan Cheese Pizza, medium","1 slice",280,12,28,13],
+    ["Pan Pepperoni Pizza, medium","1 slice",300,12,28,15],
+    ["Personal Pan Pepperoni","1 pizza",620,25,66,28],
+  ],
+  "Raising Cane's": [
+    ["Chicken Finger","1 finger",130,12,6,6],
+    ["Cane's Sauce","1 serving",190,0,3,19],
+    ["Box Combo","1 combo",1190,47,111,62],
+  ],
+  "Shake Shack": [
+    ["ShackBurger, single","1 burger",530,30,40,30],
+    ["Crinkle Cut Fries","1 order",470,6,58,23],
+  ],
+  "Packaged": [
+    ["Quest — Quest Bar, Chocolate Chip Cookie Dough","1 bar",190,21,21,8],
+    ["Pure Protein — Pure Protein Bar, Chocolate Peanut Butter","1 bar",180,20,17,5],
+    ["RXBAR — RXBAR, Chocolate Sea Salt","1 bar",210,12,24,9],
+    ["Clif — Clif Bar, Chocolate Chip","1 bar",250,9,45,5],
+    ["Premier Protein — Premier Protein Shake","11 fl oz",160,30,5,3],
+    ["Fairlife — Core Power 26g","14 fl oz",170,26,9,3.5],
+    ["Fairlife — Core Power Elite 42g","14 fl oz",230,42,8,4.5],
+    ["Optimum Nutrition — Gold Standard Whey","1 scoop",120,24,3,1],
+    ["Chobani — Greek Yogurt, Plain Nonfat","5.3 oz",90,16,6,0],
+    ["Dannon — Oikos Triple Zero, Vanilla","5.3 oz",120,15,15,0],
+    ["Kodiak Cakes — Power Cakes Mix","1/2 cup dry",190,14,30,2],
+  ],
+};
+
+/** Flatten a grouped table into the food shape the browser already speaks. */
+function flattenRows(table, brandIsCategory){
+  const out=[];
+  Object.keys(table).forEach(cat=>{
+    table[cat].forEach(([name,serving,calories,protein,carbs,fat],i)=>{
+      out.push({
+        id:(brandIsCategory?"br":"bs")+"-"+cat.replace(/\W/g,"")+"-"+i,
+        name, serving, cat,
+        brand: brandIsCategory ? cat : "Basics",
+        reference: true,
+        per:{calories,protein,carbs,fat},
+      });
+    });
+  });
+  return out;
+}
+const BASIC_FOODS = flattenRows(BASIC_ROWS, false);
+const BRAND_FOODS = flattenRows(BRAND_ROWS, true);
+const BASIC_CATS  = Object.keys(BASIC_ROWS);
+const BRAND_CATS  = Object.keys(BRAND_ROWS);
 
 // ---- The day being viewed ----
 //
@@ -918,7 +1306,6 @@ function daySubtitle(todayText, pastText){
     : pastText.replace("{d}", new Date(viewDay+"T12:00:00")
         .toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"}));
 }
-
 /** Wire a rendered day strip to a re-render of the screen it sits on. */
 function wireDayStrip(root, rerender){
   root.querySelectorAll("[data-day]").forEach(b=>b.onclick=()=>{ setViewDay(+b.dataset.day); rerender(); });
@@ -934,6 +1321,70 @@ const getWater      = ()=>DB.get("water",{});
 const waterOn       = (day=todayKey())=>+getWater()[day]||0;
 function addWater(oz, day=todayKey()){ const w=getWater(); w[day]=Math.max(0,(+w[day]||0)+oz); DB.set("water",w); }
 const getWaterPresets = ()=>DB.get("waterPresets",[8,17,40]);
+
+// ============================================================================
+// SCHEDULE — the dates Planner and Calendar share
+//
+// Both stores predate having a date at all: a task was a title and a done
+// flag, an event carried a free-text "when" that could not be sorted. Both
+// shapes still render — an item without a real date groups on its own rather
+// than being given one it never had.
+// ============================================================================
+const isDateKey = k => /^\d{4}-\d{2}-\d{2}$/.test(k||"");
+/** Whole days from today to `key`; negative means it has already passed. */
+function dayDelta(key, from=todayKey()){
+  return Math.round((new Date(key+"T12:00:00") - new Date(from+"T12:00:00"))/864e5);
+}
+/** How a date reads to a person: Today, Tomorrow, Friday, 24 Sep, 3 days ago. */
+function dateLabel(key){
+  if(!isDateKey(key)) return null;
+  const d=dayDelta(key), dt=new Date(key+"T12:00:00");
+  if(d===0) return "Today";
+  if(d===1) return "Tomorrow";
+  if(d===-1) return "Yesterday";
+  if(d<0) return `${-d} days ago`;
+  if(d<7) return dt.toLocaleDateString(undefined,{weekday:"long"});
+  return dt.toLocaleDateString(undefined,{month:"short",day:"numeric"});
+}
+const BUCKETS = [
+  {id:"past",     label:"Overdue",   late:true},
+  {id:"today",    label:"Today"},
+  {id:"tomorrow", label:"Tomorrow"},
+  {id:"week",     label:"This week"},
+  {id:"later",    label:"Later"},
+  {id:"none",     label:"No date"},
+];
+function bucketOf(key){
+  if(!isDateKey(key)) return "none";
+  const d=dayDelta(key);
+  return d<0 ? "past" : d===0 ? "today" : d===1 ? "tomorrow" : d<7 ? "week" : "later";
+}
+/** Sort key for a date: undated sorts last rather than first. */
+const dateSort = key => isDateKey(key) ? dayDelta(key) : 1e6;
+
+const PRIORITIES = [{id:"high",label:"High"},{id:"",label:"Normal"},{id:"low",label:"Low"}];
+const PRIO_RANK = {high:0, "":1, undefined:1, low:2};
+
+/** Open tasks and scheduled events, in the order they actually come at you. */
+function upNext(limit=5){
+  const items=[];
+  DB.get("tasks",[]).filter(t=>!t.done).forEach(t=>items.push({
+    kind:"task", icon:"planner", title:t.title, notes:t.notes,
+    date:t.due, sort:dateSort(t.due), prio:t.priority,
+  }));
+  DB.get("events",[]).forEach(e=>{
+    // An event with no real date is not "next" — and one already past is not
+    // coming up, however recently it was.
+    if(!isDateKey(e.date) || dayDelta(e.date)<0) return;
+    items.push({kind:"event", icon:"calendar", title:e.title, notes:e.notes,
+      date:e.date, time:e.time, sort:dateSort(e.date)});
+  });
+  items.sort((a,b)=> a.sort-b.sort
+    || (PRIO_RANK[a.prio]??1)-(PRIO_RANK[b.prio]??1)
+    || (a.time||"99:99").localeCompare(b.time||"99:99")
+    || String(a.title).localeCompare(String(b.title)));
+  return items.slice(0,limit);
+}
 
 // ============================================================================
 // FITNESS DOMAIN — ported from the LiftCoach logic, plain functions.
@@ -1067,6 +1518,15 @@ function runCoach(){
     const d=getDayTypes()[dt];
     out.push([`${d.label} day — ${(+d.calories||0).toLocaleString()} cal, ${+d.carbs||0}g carbs.`,"info"]);
   }
+
+  // What is actually due. Overdue is a warning; today's calendar is context.
+  const openTasks=DB.get("tasks",[]).filter(x=>!x.done);
+  const overdue=openTasks.filter(x=>isDateKey(x.due)&&dayDelta(x.due)<0);
+  if(overdue.length) out.push([`${overdue.length} task${overdue.length===1?"":"s"} overdue.`,"warn"]);
+  const evToday=DB.get("events",[]).filter(x=>x.date===day)
+    .sort((a,b)=>(a.time||"99:99").localeCompare(b.time||"99:99"));
+  if(evToday.length) out.push([
+    `${evToday.length} thing${evToday.length===1?"":"s"} on the calendar today${evToday[0].time?` — ${esc(evToday[0].title)} at ${evToday[0].time}`:""}.`,"info"]);
 
   // Plan for today
   const pt=plannedToday(plan);
@@ -1274,7 +1734,7 @@ function show(name){
   // Landing on a section always starts at today; the day strip travels from
   // there. Without this you could leave Food on last Tuesday and come back to
   // what looks like a day where you ate nothing.
-  if(name!==current) viewDay=todayKey();
+  if(name!==current){ viewDay=todayKey(); foodTab="today"; }
   current = name;
   document.querySelectorAll("nav button").forEach(b=>{ const on=b.dataset.module===name; b.classList.toggle("active",on); if(on) b.setAttribute("aria-current","page"); else b.removeAttribute("aria-current"); });
   $("#crumb").textContent = name.toUpperCase();
@@ -1296,6 +1756,8 @@ function show(name){
   }[name];
   $("#eyebrow").textContent = heads[0]; $("#title").innerHTML = esc(heads[1]).replace(/\.$/,'<span>.</span>'); $("#subtitle").textContent = heads[2];
   if(name==="Command") renderCommand();
+  else if(name==="Planner") renderPlanner();
+  else if(name==="Calendar") renderCalendar();
   else if(name==="Fitness") renderFitness();
   else if(name==="Food") renderFood();
   else if(name==="Steps") renderSteps();
@@ -1332,7 +1794,7 @@ function renderCommand(){
   const day=todayKey(); const foodLog=DB.get("foodLog",{}); const totals=foodTotals(foodLog[day]); const t=getTargets();
   const proteinLeft=Math.max(0,Math.round(t.protein-totals.protein));
   const coach=runCoach();
-  const tasks=DB.get("tasks",[]).filter(e=>!e.done).slice(0,4);
+  const next=upNext(5);
 
   $("#view-command").innerHTML = `
     <div class="hero">
@@ -1370,8 +1832,23 @@ function renderCommand(){
     </div>
 
     <div class="panel">
-      <div class="section-title"><h2>Up next</h2><button class="ghost" onclick="show('Planner')">Planner →</button></div>
-      ${tasks.length ? tasks.map(e=>`<div class="entry"><div class="body"><strong>${esc(e.title)}</strong>${e.notes?`<p>${esc(e.notes)}</p>`:""}</div></div>`).join("") : `<p class="empty">No open tasks. Add one from Planner.</p>`}
+      <div class="section-title"><h2>Up next</h2>
+        <span class="row" style="gap:14px">
+          <button class="ghost" onclick="show('Planner')">Planner →</button>
+          <button class="ghost" onclick="show('Calendar')">Calendar →</button>
+        </span></div>
+      ${next.length ? next.map(n=>{
+        const late=isDateKey(n.date)&&dayDelta(n.date)<0;
+        const now=n.date===todayKey();
+        const when=isDateKey(n.date) ? dateLabel(n.date)+(n.time?` · ${n.time}`:"") : null;
+        const prio=(n.prio==="high"||n.prio==="low")?n.prio:"";
+        return `<div class="entry">
+          <span class="upnext-ic" title="${n.kind==="task"?"Task":"Event"}">${icon(n.icon)}</span>
+          ${prio?`<span class="prio ${prio}" role="img" aria-label="${prio==="high"?"High":"Low"} priority"></span>`:""}
+          <div class="body"><strong>${esc(n.title)}</strong>${n.notes?`<p>${esc(n.notes)}</p>`:""}</div>
+          ${when?`<span class="due${late?" late":now?" now":""}">${esc(when.toUpperCase())}</span>`:""}
+        </div>`; }).join("")
+      : `<p class="empty">Nothing queued. Add a task or an event.</p>`}
     </div>`;
 
   renderActions();
@@ -1454,6 +1931,8 @@ function renderActions(){
 function pickGroup(g){ actionGroup=g; DB.set("actionTab",g); renderActions(); }
 
 function runAction(a){
+  if(a.label==="Add Task"){ show("Planner"); openTask(); return; }
+  if(a.label==="Add Event"){ show("Calendar"); openEvent(); return; }
   if(a.label==="Add Food"||a.label==="Scan Food"){ show("Food"); openFood(a.label==="Scan Food"); return; }
   if(a.label==="Log Lift"){ show("Fitness"); openLift(); return; }
   if(a.label==="Log Session"){ show("Fitness"); openMat(); return; }
@@ -1544,90 +2023,142 @@ function renderFitness(){
 // ============================================================================
 // FOOD VIEW
 // ============================================================================
+// ============================================================================
+// FOOD VIEW
+//
+// Split into three sub-screens behind one command bar. The whole day used to
+// be a single long scroll — the carb-cycle planner sat below the macro ring,
+// the water panel and nothing else could be seen at once. Now the bar carries
+// the day, the day's type and Add food, and the tabs decide what is under it.
+// ============================================================================
+const FOOD_TABS = [["today","Today"],["cycle","Carb cycle"],["nutrition","Nutrition"]];
+let foodTab = "today";
+
 function renderFood(){
   const day=viewDay; const log=DB.get("foodLog",{}); const foods=log[day]||[];
   const totals=foodTotals(foods); const t=getTargets(day);
-  const dayNutrition=sumNutrition(foods);
+  const dayType=dayTypeFor(day), types=getDayTypes();
+  const sp=macroSplit(totals);
 
-  // Group the day by meal. Entries logged before meals existed have no meal,
-  // so they get their own group rather than being silently filed under one.
+  const bar = `
+    <div class="panel foodbar">
+      <div class="foodbar-top">
+        ${dayStrip()}
+        <div class="row" style="gap:12px;flex-wrap:wrap">
+          ${dayType?`<span class="daytype"><b>${esc(types[dayType].label.toUpperCase())} DAY</b> · ${(+types[dayType].calories||0).toLocaleString()} CAL</span>`:""}
+          <button class="primary" id="food-add">Add food</button>
+        </div>
+      </div>
+      <div class="tabs" id="food-tabs" role="tablist" aria-label="Food screens"></div>
+    </div>`;
+
+  let body="";
+  if(foodTab==="today")      body=foodToday(day, foods, totals, t, sp, dayType, types);
+  else if(foodTab==="cycle") body=foodCycle();
+  else                       body=foodNutrition(foods);
+
+  $("#view-food").innerHTML = bar + `<div id="food-panel" role="tabpanel" aria-labelledby="ft-${foodTab}">${body}</div>`;
+
+  // ---- tabs ----
+  const tabs=$("#food-tabs");
+  FOOD_TABS.forEach(([id,label],i)=>{
+    const b=document.createElement("button"); b.type="button"; b.id="ft-"+id;
+    b.setAttribute("role","tab"); b.setAttribute("aria-controls","food-panel");
+    b.setAttribute("aria-selected", String(id===foodTab));
+    b.tabIndex = id===foodTab ? 0 : -1;
+    // The first tab is a screen, but it names a day — so it stops claiming
+    // "Today" when the day strip has travelled somewhere else.
+    b.textContent = id==="today" ? (isToday()?"Today":"That day") : label;
+    b.onclick=()=>{ foodTab=id; renderFood(); };
+    b.onkeydown=e=>{
+      let j=null;
+      if(e.key==="ArrowRight") j=(i+1)%FOOD_TABS.length;
+      else if(e.key==="ArrowLeft") j=(i-1+FOOD_TABS.length)%FOOD_TABS.length;
+      else if(e.key==="Home") j=0; else if(e.key==="End") j=FOOD_TABS.length-1;
+      if(j===null) return;
+      e.preventDefault(); foodTab=FOOD_TABS[j][0]; renderFood(); $("#ft-"+foodTab).focus();
+    };
+    tabs.append(b);
+  });
+
+  daySubtitle("Today against your targets.", "{d} — against your targets.");
+  wireDayStrip($("#view-food"), renderFood);
+  $("#food-add").onclick=()=>openBrowse();
+
+  // ---- per-tab wiring ----
+  if(foodTab==="today"){
+    $("#food-obsidian").onclick=openObsidian;
+    $("#food-targets").onclick=()=>carbCycleOn()?openDayTypes():openTargets();
+    $("#water-settings").onclick=openWaterSettings;
+    $("#water-custom").onclick=openWater;
+    const undo=$("#water-undo");
+    if(undo) undo.onclick=()=>{ const wt=getWater(); delete wt[viewDay]; DB.set("water",wt); renderFood(); toast("Water cleared"); };
+    if($("#food-daytype")) $("#food-daytype").onclick=()=>openDayOverride(day);
+    $("#view-food").querySelectorAll("[data-water]").forEach(b=>b.onclick=()=>{ addWater(+b.dataset.water, viewDay); renderFood(); });
+    $("#view-food").querySelectorAll("[data-addmeal]").forEach(b=>b.onclick=()=>openBrowse(b.dataset.addmeal));
+    $("#view-food").querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>openLoggedEntry(+b.dataset.edit));
+    $("#view-food").querySelectorAll("[data-food]").forEach(b=>b.onclick=()=>{
+      const l=DB.get("foodLog",{}); (l[viewDay]||[]).splice(+b.dataset.food,1); DB.set("foodLog",l);
+      renderFood(); toast("Removed"); });
+  }
+  if(foodTab==="cycle"){
+    $("#cc-toggle").onclick=()=>{ DB.set("carbCycle", !carbCycleOn()); renderFood();
+      toast(carbCycleOn()?"Carb cycling on":"Back to a single target"); };
+    if($("#cc-edit"))  $("#cc-edit").onclick=openDayTypes;
+    if($("#cc-match")) $("#cc-match").onclick=matchTrainingPlan;
+    if($("#cc-day"))   $("#cc-day").onclick=()=>openDayOverride(day);
+    renderCarbWeek();
+  }
+}
+
+/** The day itself: where you stand, what you drank, what you ate. */
+function foodToday(day, foods, totals, t, sp, dayType, types){
+  const w=waterOn(day), wGoal=getWaterGoal(), u=WATER_UNITS[getWaterUnit()];
+  const inUnit=v=>{ const n=v/u.per; return n>=100?Math.round(n):+n.toFixed(n<10?1:0); };
+
   const groups=MEALS.map(m=>({name:m, items:foods.map((f,i)=>({f,i})).filter(x=>x.f.meal===m)}));
   const loose=foods.map((f,i)=>({f,i})).filter(x=>!MEALS.includes(x.f.meal));
   if(loose.length) groups.push({name:"Uncategorised", items:loose, loose:true});
 
-  const w=waterOn(day), wGoal=getWaterGoal(), unit=getWaterUnit(), u=WATER_UNITS[unit];
-  const dayType=dayTypeFor(day), types=getDayTypes();
-  const inUnit=v=>{ const n=v/u.per; return n>=100?Math.round(n):+n.toFixed(n<10?1:0); };
-
-  $("#view-food").innerHTML = `
-    <div class="grid cols-2">
-      <div class="panel">
-        <div class="section-title"><h2>${isToday()?"Today":"That day"}</h2>${dayStrip()}<button class="primary" id="food-add">Add food</button></div>
-        <div class="macro-row">
-          ${donut(totals)}
-          <div class="macro-legend">
-            ${MACROS.map(([k,label,tok])=>{ const sp=macroSplit(totals);
-              return `<div><div class="pct" style="color:var(${tok})">${sp[k]}%</div>
-                <div class="g">${nfmt(totals[k])||0} g</div><div class="n">${label}</div></div>`; }).join("")}
-          </div>
-        </div>
-        <p class="muted" style="margin:16px 0 0">
-          ${totals.calories<=t.calories
-            ? `${Math.round(t.calories-totals.calories).toLocaleString()} calories left of ${t.calories.toLocaleString()}.`
-            : `${Math.round(totals.calories-t.calories).toLocaleString()} calories over ${t.calories.toLocaleString()}.`}
-        </p>
-        ${dayType ? `<div class="row" style="margin-top:12px;gap:12px;flex-wrap:wrap">
-          <span class="daytype"><b>${esc(types[dayType].label.toUpperCase())} DAY</b> · ${(+types[dayType].carbs||0)}G CARBS</span>
-          <button class="ghost" id="food-daytype">Change just this day</button>
-        </div>` : ""}
-        <div class="row" style="margin-top:14px;gap:14px;flex-wrap:wrap">
-          <button class="btn" id="food-obsidian">Import Obsidian</button>
-          <button class="ghost" id="food-targets">${carbCycleOn()?"Edit day types":"Edit targets"}</button>
-        </div>
-      </div>
-
-      <div class="panel">
-        <div class="section-title"><h2>Percent of daily goals</h2></div>
-        ${goalBars(totals,t)}
-        <div class="section-title" style="margin:24px 0 12px"><h2>Water</h2><button class="ghost" id="water-settings">Goal &amp; unit</button></div>
-        <div class="row" style="gap:18px;flex-wrap:wrap">
-          ${ring(inUnit(w), inUnit(wGoal), "WATER", " "+u.label)}
-          <div style="flex:1;min-width:150px">
-            <div class="presets">
-              ${getWaterPresets().map(oz=>`<button class="btn" data-water="${oz}">+${inUnit(oz)}</button>`).join("")}
+  return `
+    <div class="panel">
+      <div class="split">
+        <div class="split-a">
+          <div class="macro-row">
+            ${donut(totals)}
+            <div class="macro-legend">
+              ${MACROS.map(([k,label,tok])=>`<div><div class="pct" style="color:var(${tok})">${sp[k]}%</div>
+                <div class="g">${nfmt(totals[k])||0} g</div><div class="n">${label}</div></div>`).join("")}
             </div>
-            <button class="ghost" id="water-custom" style="margin-top:10px">Enter an amount</button>
-            ${w>0?`<button class="ghost" id="water-undo" style="margin-left:14px">Undo</button>`:""}
           </div>
+          <p class="muted" style="margin:16px 0 0">
+            ${totals.calories<=t.calories
+              ? `${Math.round(t.calories-totals.calories).toLocaleString()} calories left of ${t.calories.toLocaleString()}.`
+              : `${Math.round(totals.calories-t.calories).toLocaleString()} calories over ${t.calories.toLocaleString()}.`}
+            ${dayType?`<button class="ghost" id="food-daytype" style="margin-left:10px">Change this day</button>`:""}
+          </p>
+        </div>
+        <div class="split-b">
+          <p class="eyebrow" style="margin:0 0 12px">Percent of daily goals</p>
+          ${goalBars(totals,t)}
         </div>
       </div>
     </div>
 
     <div class="panel">
-      <div class="section-title">
-        <h2>Carb cycle</h2>
-        <button class="switch" id="cc-toggle" aria-pressed="${carbCycleOn()}">
-          <span class="knob" aria-hidden="true"></span><span>${carbCycleOn()?"On":"Off"}</span>
-        </button>
+      <div class="section-title"><h2>Water</h2><button class="ghost" id="water-settings">Goal &amp; unit</button></div>
+      <div class="row" style="gap:20px;flex-wrap:wrap">
+        ${ring(inUnit(w), inUnit(wGoal), "WATER", " "+u.label)}
+        <div style="flex:1;min-width:170px">
+          <div class="presets">
+            ${getWaterPresets().map(oz=>`<button class="btn" data-water="${oz}">+${inUnit(oz)}</button>`).join("")}
+          </div>
+          <div class="row" style="margin-top:10px;gap:14px">
+            <button class="ghost" id="water-custom">Enter an amount</button>
+            ${w>0?`<button class="ghost" id="water-undo">Undo</button>`:""}
+          </div>
+        </div>
       </div>
-      ${carbCycleOn() ? `
-        <p class="muted" style="font-size:13.5px;margin:0 0 6px">
-          Each day runs its own targets. Protein holds steady; carbs do the swinging.
-          ${carbWeekAverage()!=null?`Averages <strong>${carbWeekAverage().toLocaleString()} cal/day</strong> across the week.`:""}
-        </p>
-        <div id="cc-week"></div>
-        <div class="row" style="margin-top:14px;gap:14px;flex-wrap:wrap">
-          <button class="btn" id="cc-match">Match my training plan</button>
-          <button class="ghost" id="cc-edit">Edit day types</button>
-        </div>`
-      : `
-        <p class="muted" style="font-size:13.5px;margin:0">
-          Turn this on to run a high / mid / low rotation instead of one target every day —
-          ${(+getDayTypes().high.calories).toLocaleString()} on a high day,
-          ${(+getDayTypes().mid.calories).toLocaleString()} mid,
-          ${(+getDayTypes().low.calories).toLocaleString()} low by default, all editable.
-          Your single target set stays where it is and comes back if you turn this off.
-        </p>`}
     </div>
 
     <div class="panel">
@@ -1652,36 +2183,60 @@ function renderFood(){
             </div>`).join("")
           : `<p class="empty" style="padding:6px 0">Nothing logged.</p>`}`;
       }).join("")}
-    </div>
+      <div class="row" style="margin-top:18px;gap:16px;flex-wrap:wrap;padding-top:14px;border-top:1px solid var(--rim)">
+        <button class="btn" id="food-obsidian">Import Obsidian</button>
+        <button class="ghost" id="food-targets">${carbCycleOn()?"Edit day types":"Edit targets"}</button>
+      </div>
+    </div>`;
+}
 
+/** The rotation, on its own screen instead of buried under the day. */
+function foodCycle(){
+  const types=getDayTypes();
+  return `
+    <div class="panel">
+      <div class="section-title">
+        <h2>Carb cycle</h2>
+        <button class="switch" id="cc-toggle" aria-pressed="${carbCycleOn()}">
+          <span class="knob" aria-hidden="true"></span><span>${carbCycleOn()?"On":"Off"}</span>
+        </button>
+      </div>
+      ${carbCycleOn() ? `
+        <p class="muted" style="font-size:13.5px;margin:0 0 4px">
+          Each day runs its own targets. Protein holds steady; carbs do the swinging.
+          ${carbWeekAverage()!=null?`Averages <strong>${carbWeekAverage().toLocaleString()} cal/day</strong> across the week.`:""}
+        </p>
+        <div id="cc-week"></div>
+        <div class="row" style="margin-top:16px;gap:16px;flex-wrap:wrap">
+          <button class="btn" id="cc-match">Match my training plan</button>
+          <button class="ghost" id="cc-edit">Edit day types</button>
+          <button class="ghost" id="cc-day">Change ${isToday()?"today":"this day"}</button>
+        </div>`
+      : `
+        <p class="muted" style="font-size:14px;margin:0 0 16px">
+          Run a high / mid / low rotation instead of one target every day. Your single
+          target set stays where it is and comes back if you turn this off.
+        </p>
+        <div class="typepreview">
+          ${DAY_TYPES.map(k=>`<div>
+            <div class="tag">${esc(types[k].label.toUpperCase())} DAY</div>
+            <div class="g">${(+types[k].calories||0).toLocaleString()}</div>
+            <div class="n">${+types[k].carbs||0}c · ${+types[k].protein||0}p · ${+types[k].fat||0}f</div>
+          </div>`).join("")}
+        </div>`}
+    </div>`;
+}
+
+/** The full label for the day, given the room to be read. */
+function foodNutrition(foods){
+  const n=sumNutrition(foods);
+  return `
     <div class="panel">
       <div class="section-title"><h2>Nutrition facts — ${isToday()?"today":esc(viewDay)}</h2>
-        <button class="ghost" id="nf-toggle" aria-expanded="${DB.get("nfOpen",false)}" aria-controls="nf-body">
-          ${DB.get("nfOpen",false)?"Hide":"Show"}</button></div>
-      <div id="nf-body" ${DB.get("nfOpen",false)?"":"hidden"}>${nutritionFacts(dayNutrition)}</div>
+        <span class="tag">${foods.length} ITEM${foods.length===1?"":"S"}</span></div>
+      ${foods.length ? nutritionFacts(n)
+        : `<p class="empty">Nothing logged, so there is nothing to add up.</p>`}
     </div>`;
-
-  $("#food-add").onclick=()=>openBrowse();
-  $("#food-obsidian").onclick=openObsidian;
-  $("#food-targets").onclick=()=>carbCycleOn()?openDayTypes():openTargets();
-  $("#water-settings").onclick=openWaterSettings;
-  $("#water-custom").onclick=openWater;
-  const undo=$("#water-undo"); if(undo) undo.onclick=()=>{ const wt=getWater(); delete wt[viewDay]; DB.set("water",wt); renderFood(); toast("Water cleared"); };
-  $("#nf-toggle").onclick=()=>{ DB.set("nfOpen",!DB.get("nfOpen",false)); renderFood(); };
-  daySubtitle("Today against your targets.", "{d} — against your targets.");
-  wireDayStrip($("#view-food"), renderFood);
-  $("#cc-toggle").onclick=()=>{ DB.set("carbCycle", !carbCycleOn()); renderFood();
-    toast(carbCycleOn()?"Carb cycling on":"Back to a single target"); };
-  if($("#food-daytype")) $("#food-daytype").onclick=()=>openDayOverride(day);
-  if($("#cc-edit"))  $("#cc-edit").onclick=openDayTypes;
-  if($("#cc-match")) $("#cc-match").onclick=matchTrainingPlan;
-  renderCarbWeek();
-  $("#view-food").querySelectorAll("[data-water]").forEach(b=>b.onclick=()=>{ addWater(+b.dataset.water, viewDay); renderFood(); });
-  $("#view-food").querySelectorAll("[data-addmeal]").forEach(b=>b.onclick=()=>openBrowse(b.dataset.addmeal));
-  $("#view-food").querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>openLoggedEntry(+b.dataset.edit));
-  $("#view-food").querySelectorAll("[data-food]").forEach(b=>b.onclick=()=>{
-    const l=DB.get("foodLog",{}); (l[viewDay]||[]).splice(+b.dataset.food,1); DB.set("foodLog",l);
-    renderFood(); toast("Removed"); });
 }
 
 // ---- The week planner: one row per weekday, three types to choose from ----
@@ -1961,6 +2516,289 @@ function openStepGoal(){
   openDialog($("#entry-dialog")); setTimeout(()=>$("#sg-val").focus(),40);
 }
 
+// ============================================================================
+// PLANNER
+// ============================================================================
+let taskFilter = "open";
+
+function renderPlanner(){
+  const all=DB.get("tasks",[]);
+  const open=all.filter(t=>!t.done), done=all.filter(t=>t.done);
+  const list = taskFilter==="done" ? done : taskFilter==="all" ? all : open;
+  const overdue=open.filter(t=>isDateKey(t.due)&&dayDelta(t.due)<0);
+  const dueToday=open.filter(t=>t.due===todayKey());
+
+  // Group into buckets, then order inside each: priority first, then title.
+  const groups=BUCKETS.map(b=>({...b, items:list.filter(t=>!t.done && bucketOf(t.due)===b.id)}))
+    .filter(g=>g.items.length);
+  groups.forEach(g=>g.items.sort((a,b)=>
+    dateSort(a.due)-dateSort(b.due)
+    || (PRIO_RANK[a.priority]??1)-(PRIO_RANK[b.priority]??1)
+    || String(a.title).localeCompare(String(b.title))));
+  const doneShown = taskFilter!=="open" ? done : [];
+
+  $("#view-generic").innerHTML = `
+    <div class="grid cols-2">
+      <div class="panel">
+        <div class="section-title"><h2>Open</h2><button class="primary" id="pl-add">Add task</button></div>
+        <p class="big">${open.length} <span class="muted" style="font-size:15px">open</span></p>
+        <p class="muted" style="margin:2px 0 0">
+          ${overdue.length?`${overdue.length} overdue · `:""}${dueToday.length?`${dueToday.length} due today · `:""}${done.length} done
+        </p>
+      </div>
+      <div class="panel">
+        <div class="section-title"><h2>Show</h2></div>
+        <div class="tabs" id="pl-tabs" role="tablist" aria-label="Which tasks to show"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="section-title"><h2>Tasks</h2><span class="tag">${list.length} SHOWN</span></div>
+      ${groups.length||doneShown.length ? groups.map(g=>`
+        <div class="group-head${g.late?" late":""}"><h3>${esc(g.label)}</h3><span class="meal-kcal">${g.items.length}</span></div>
+        ${g.items.map(t=>taskRow(t)).join("")}`).join("")
+        + (doneShown.length?`<div class="group-head"><h3>Done</h3><span class="meal-kcal">${doneShown.length}</span></div>${doneShown.map(t=>taskRow(t)).join("")}`:"")
+        : `<p class="empty">${taskFilter==="done"?"Nothing finished yet.":"Nothing here. Add a task."}</p>`}
+    </div>`;
+
+  const tabs=$("#pl-tabs");
+  [["open","Open",open.length],["done","Done",done.length],["all","All",all.length]].forEach(([id,label,n],i,arr)=>{
+    const b=document.createElement("button"); b.type="button"; b.id="pl-tab-"+id;
+    b.setAttribute("role","tab"); b.setAttribute("aria-controls","view-generic");
+    b.setAttribute("aria-selected", String(id===taskFilter));
+    b.tabIndex = id===taskFilter ? 0 : -1;
+    b.innerHTML=`${esc(label)}<span class="count">${n}</span>`;
+    b.onclick=()=>{ taskFilter=id; renderPlanner(); };
+    b.onkeydown=e=>{
+      let j=null;
+      if(e.key==="ArrowRight") j=(i+1)%arr.length;
+      else if(e.key==="ArrowLeft") j=(i-1+arr.length)%arr.length;
+      else if(e.key==="Home") j=0; else if(e.key==="End") j=arr.length-1;
+      if(j===null) return;
+      e.preventDefault(); taskFilter=arr[j][0]; renderPlanner(); $("#pl-tab-"+arr[j][0]).focus();
+    };
+    tabs.append(b);
+  });
+
+  $("#pl-add").onclick=()=>openTask();
+  wireListRows("#view-generic", "tasks", renderPlanner, openTask);
+}
+
+function taskRow(t){
+  const label=dateLabel(t.due);
+  const late=isDateKey(t.due)&&dayDelta(t.due)<0&&!t.done;
+  const now=t.due===todayKey()&&!t.done;
+  const prio=(t.priority==="high"||t.priority==="low")?t.priority:"";
+  return `<div class="entry">
+    <button type="button" class="chip check-box${t.done?' on':''}" data-toggle="${esc(t.id)}"
+      aria-pressed="${!!t.done}" aria-label="Mark ${esc(t.title)} ${t.done?"not done":"done"}">${icon("check")}</button>
+    ${prio?`<span class="prio ${prio}" title="${prio==="high"?"High":"Low"} priority" aria-label="${prio==="high"?"High":"Low"} priority" role="img"></span>`:""}
+    <div class="body">
+      <strong style="${t.done?'text-decoration:line-through;color:var(--muted)':''}">${esc(t.title)}</strong>
+      ${t.notes?`<p>${esc(t.notes)}</p>`:""}
+    </div>
+    ${label?`<span class="due${late?" late":now?" now":""}">${esc(label.toUpperCase())}</span>`:""}
+    <button type="button" class="del" data-edit-id="${esc(t.id)}" aria-label="Edit ${esc(t.title)}">${icon("edit")}</button>
+    <button type="button" class="del" data-del="${esc(t.id)}" aria-label="Delete ${esc(t.title)}">${icon("x")}</button>
+  </div>`;
+}
+
+// ============================================================================
+// CALENDAR
+// ============================================================================
+let eventFilter = "upcoming";
+
+function renderCalendar(){
+  const all=DB.get("events",[]);
+  const scheduled=all.filter(e=>isDateKey(e.date));
+  const upcoming=scheduled.filter(e=>dayDelta(e.date)>=0);
+  const past=scheduled.filter(e=>dayDelta(e.date)<0);
+  const unscheduled=all.filter(e=>!isDateKey(e.date));
+
+  const byTime=(a,b)=>dateSort(a.date)-dateSort(b.date)
+    || (a.time||"99:99").localeCompare(b.time||"99:99")
+    || String(a.title).localeCompare(String(b.title));
+
+  let groups=[];
+  if(eventFilter==="past"){
+    groups=[{label:"Earlier", items:[...past].sort((a,b)=>byTime(b,a))}];
+  }else{
+    groups=BUCKETS.filter(b=>b.id!=="past"&&b.id!=="none")
+      .map(b=>({label:b.label, items:upcoming.filter(e=>bucketOf(e.date)===b.id).sort(byTime)}));
+    if(eventFilter==="all") groups.push({label:"Earlier", items:[...past].sort((a,b)=>byTime(b,a))});
+    // Events carried over from before there was a date field keep their
+    // free-text "when" and sit in their own group rather than being guessed at.
+    groups.push({label:"Unscheduled", items:unscheduled});
+  }
+  groups=groups.filter(g=>g.items.length);
+  const shown=groups.reduce((a,g)=>a+g.items.length,0);
+  const next=upcoming.sort(byTime)[0];
+
+  $("#view-generic").innerHTML = `
+    <div class="grid cols-2">
+      <div class="panel">
+        <div class="section-title"><h2>Next up</h2><button class="primary" id="cal-add">Add event</button></div>
+        ${next ? `<p class="big">${esc(next.title)}</p>
+          <p class="muted" style="margin:2px 0 0">${esc(dateLabel(next.date))}${next.time?` · ${esc(next.time)}`:""}</p>`
+        : `<p class="empty">Nothing scheduled.</p>`}
+      </div>
+      <div class="panel">
+        <div class="section-title"><h2>Show</h2></div>
+        <div class="tabs" id="cal-tabs" role="tablist" aria-label="Which events to show"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="section-title"><h2>Events</h2><span class="tag">${shown} SHOWN</span></div>
+      ${groups.length ? groups.map(g=>`
+        <div class="group-head"><h3>${esc(g.label)}</h3><span class="meal-kcal">${g.items.length}</span></div>
+        ${g.items.map(e=>eventRow(e)).join("")}`).join("")
+        : `<p class="empty">${eventFilter==="past"?"Nothing has happened yet.":"Nothing scheduled. Add an event."}</p>`}
+    </div>`;
+
+  const tabs=$("#cal-tabs");
+  [["upcoming","Upcoming",upcoming.length+unscheduled.length],["past","Past",past.length],["all","All",all.length]]
+    .forEach(([id,label,n],i,arr)=>{
+      const b=document.createElement("button"); b.type="button"; b.id="cal-tab-"+id;
+      b.setAttribute("role","tab"); b.setAttribute("aria-controls","view-generic");
+      b.setAttribute("aria-selected", String(id===eventFilter));
+      b.tabIndex = id===eventFilter ? 0 : -1;
+      b.innerHTML=`${esc(label)}<span class="count">${n}</span>`;
+      b.onclick=()=>{ eventFilter=id; renderCalendar(); };
+      b.onkeydown=e=>{
+        let j=null;
+        if(e.key==="ArrowRight") j=(i+1)%arr.length;
+        else if(e.key==="ArrowLeft") j=(i-1+arr.length)%arr.length;
+        else if(e.key==="Home") j=0; else if(e.key==="End") j=arr.length-1;
+        if(j===null) return;
+        e.preventDefault(); eventFilter=arr[j][0]; renderCalendar(); $("#cal-tab-"+arr[j][0]).focus();
+      };
+      tabs.append(b);
+    });
+
+  $("#cal-add").onclick=()=>openEvent();
+  wireListRows("#view-generic", "events", renderCalendar, openEvent);
+}
+
+function eventRow(e){
+  const label=dateLabel(e.date);
+  const now=e.date===todayKey();
+  const when = label ? label + (e.time?` · ${e.time}`:"") : (e.when || "");
+  return `<div class="entry">
+    <div class="body">
+      <strong>${esc(e.title)}</strong>
+      ${e.notes?`<p>${esc(e.notes)}</p>`:""}
+    </div>
+    ${when?`<span class="due${now?" now":""}">${esc(when.toUpperCase())}</span>`:""}
+    <button type="button" class="del" data-edit-id="${esc(e.id)}" aria-label="Edit ${esc(e.title)}">${icon("edit")}</button>
+    <button type="button" class="del" data-del="${esc(e.id)}" aria-label="Delete ${esc(e.title)}">${icon("x")}</button>
+  </div>`;
+}
+
+/** Toggle / edit / delete wiring shared by the two list screens. */
+function wireListRows(root, store, rerender, opener){
+  const host=$(root);
+  host.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{
+    DB.set(store, DB.get(store,[]).filter(x=>x.id!==b.dataset.del)); rerender(); toast("Deleted"); });
+  host.querySelectorAll("[data-edit-id]").forEach(b=>b.onclick=()=>{
+    opener(DB.get(store,[]).find(x=>x.id===b.dataset.editId)); });
+  host.querySelectorAll("[data-toggle]").forEach(b=>b.onclick=()=>{
+    const l=DB.get(store,[]); const e=l.find(x=>x.id===b.dataset.toggle);
+    if(e){ e.done=!e.done; DB.set(store,l); } rerender(); });
+}
+
+// ---- Task capture ----
+function openTask(existing){
+  const t=existing||{};
+  $("#entry-title").textContent = existing ? "Edit task" : "Add task";
+  $("#entry-fields").innerHTML=`
+    <label for="tk-title">Task</label><input id="tk-title" value="${esc(t.title||"")}"/>
+    <label for="tk-due">Due <span class="faint">(optional)</span></label>
+    <input id="tk-due" type="date" value="${esc(isDateKey(t.due)?t.due:"")}"/>
+    <div class="chip-row" style="margin-top:8px">
+      <button type="button" class="btn" data-quick="0">Today</button>
+      <button type="button" class="btn" data-quick="1">Tomorrow</button>
+      <button type="button" class="btn" data-quick="7">Next week</button>
+      <button type="button" class="btn" data-quick="">No date</button>
+    </div>
+    <label>Priority</label><div class="chip-row" id="tk-prio"></div>
+    <label for="tk-notes">Notes <span class="faint">(optional)</span></label>
+    <textarea id="tk-notes">${esc(t.notes||"")}</textarea>`;
+  let prio = (t.priority==="high"||t.priority==="low") ? t.priority : "";
+  const chips=$("#tk-prio");
+  PRIORITIES.forEach(pr=>{
+    const c=document.createElement("button");
+    c.type="button"; c.className="chip"+(prio===pr.id?" on":"");
+    c.setAttribute("aria-pressed", String(prio===pr.id));
+    c.textContent=pr.label;
+    c.onclick=()=>{ prio=pr.id;
+      [...chips.children].forEach(x=>{ x.classList.remove("on"); x.setAttribute("aria-pressed","false"); });
+      c.classList.add("on"); c.setAttribute("aria-pressed","true"); };
+    chips.append(c);
+  });
+  $("#entry-fields").querySelectorAll("[data-quick]").forEach(b=>b.onclick=()=>{
+    const v=b.dataset.quick;
+    if(v===""){ $("#tk-due").value=""; return; }
+    const d=new Date(); d.setDate(d.getDate()+ +v); $("#tk-due").value=todayKey(d);
+  });
+  $("#entry-form").onsubmit=e=>{
+    e.preventDefault();
+    const title=$("#tk-title").value.trim(); if(!title){ $("#tk-title").focus(); return; }
+    const due=$("#tk-due").value;
+    const rec={ id:t.id||uid(), title, notes:$("#tk-notes").value.trim(),
+      due: isDateKey(due)?due:"", priority:prio, done:!!t.done };
+    const l=DB.get("tasks",[]);
+    const i=l.findIndex(x=>x.id===rec.id);
+    if(i>=0) l[i]=rec; else l.unshift(rec);
+    DB.set("tasks",l);
+    $("#entry-dialog").close(); toast(existing?"Task updated":"Task added");
+    if(current==="Planner") renderPlanner(); else if(current==="Command") renderCommand();
+  };
+  openDialog($("#entry-dialog")); setTimeout(()=>$("#tk-title").focus(),40);
+}
+
+// ---- Event capture ----
+function openEvent(existing){
+  const ev=existing||{};
+  $("#entry-title").textContent = existing ? "Edit event" : "Add event";
+  $("#entry-fields").innerHTML=`
+    <label for="ev-title">Event</label><input id="ev-title" value="${esc(ev.title||"")}"/>
+    <div class="row" style="gap:10px">
+      <div style="flex:1"><label for="ev-date">Date</label>
+        <input id="ev-date" type="date" value="${esc(isDateKey(ev.date)?ev.date:"")}"/></div>
+      <div style="flex:1"><label for="ev-time">Time <span class="faint">(optional)</span></label>
+        <input id="ev-time" type="time" value="${esc(ev.time||"")}"/></div>
+    </div>
+    <div class="chip-row" style="margin-top:8px">
+      <button type="button" class="btn" data-quick="0">Today</button>
+      <button type="button" class="btn" data-quick="1">Tomorrow</button>
+      <button type="button" class="btn" data-quick="7">Next week</button>
+    </div>
+    ${ev.when&&!isDateKey(ev.date)?`<p class="note">This event was saved before there was a date field — it said "${esc(ev.when)}". Pick a date and it will sort with the rest.</p>`:""}
+    <label for="ev-notes">Notes <span class="faint">(optional)</span></label>
+    <textarea id="ev-notes">${esc(ev.notes||"")}</textarea>`;
+  $("#entry-fields").querySelectorAll("[data-quick]").forEach(b=>b.onclick=()=>{
+    const d=new Date(); d.setDate(d.getDate()+ +b.dataset.quick); $("#ev-date").value=todayKey(d);
+  });
+  $("#entry-form").onsubmit=e=>{
+    e.preventDefault();
+    const title=$("#ev-title").value.trim(); if(!title){ $("#ev-title").focus(); return; }
+    const date=$("#ev-date").value;
+    const rec={ id:ev.id||uid(), title, notes:$("#ev-notes").value.trim(),
+      date: isDateKey(date)?date:"", time:$("#ev-time").value||"" };
+    // Keep the old free-text "when" only while there is still no real date,
+    // so nothing that was typed once quietly disappears.
+    if(!rec.date && ev.when) rec.when=ev.when;
+    const l=DB.get("events",[]);
+    const i=l.findIndex(x=>x.id===rec.id);
+    if(i>=0) l[i]=rec; else l.unshift(rec);
+    DB.set("events",l);
+    $("#entry-dialog").close(); toast(existing?"Event updated":"Event added");
+    if(current==="Calendar") renderCalendar(); else if(current==="Command") renderCommand();
+  };
+  openDialog($("#entry-dialog")); setTimeout(()=>$("#ev-title").focus(),40);
+}
+
 // ---- GENERIC list sections ----
 function renderGeneric(name){
   const g=GENERIC[name]; const list=DB.get(g.store,[]);
@@ -2024,20 +2862,35 @@ function openEntry(module){
 // count. Typing a food's nutrition is a once-per-food job; after that it is
 // two taps.
 // ============================================================================
-const BROWSE_TABS = ["History","My Meals","My Recipes","My Foods","Basics"];
+const BROWSE_TABS = ["History","My Meals","My Recipes","My Foods","Brands","Basics"];
 let browseTab = BROWSE_TABS.includes(DB.get("foodTab","History")) ? DB.get("foodTab","History") : "History";
 let browseMeal = null;
 let browseSort = "recent";
+let browseCat = "";   // narrows the Brands / Basics tabs to one chain or group
 
 /** Total nutrition of a saved meal or recipe (all its items, as entered). */
 const itemsNutrition = m => sumNutrition((m.items||[]).map(it=>({nutrition:scaleNutrition(it.per, it.servings||1)})));
 /** A recipe's nutrition for ONE serving of it. */
 const recipePer = r => scaleNutrition(itemsNutrition(r), 1/Math.max(1, +r.servings||1));
 
+/**
+ * Search has to cope with how people actually type: "chipotle chicken" when
+ * the item is named Chicken and the brand is Chipotle, "mcdonalds fries" in
+ * either order, "chickfila" without the punctuation. So terms are matched
+ * independently against a punctuation-stripped haystack, and every term has
+ * to land somewhere — order and apostrophes stop mattering.
+ */
+const searchNorm = v => String(v||"").toLowerCase().replace(/['\u2019.\-]/g,"").replace(/\s+/g," ").trim();
+function foodMatches(it, terms){
+  const hay = searchNorm([it.name, it.brand, it.serving, it.cat].filter(Boolean).join(" "));
+  return terms.every(t=>hay.includes(t));
+}
+
 function browseSource(tab){
   if(tab==="My Foods")   return getMyFoods().map(f=>({...f, kind:"food", verified:true}));
   if(tab==="My Meals")   return getMyMeals().map(m=>({...m, kind:"meal"}));
   if(tab==="My Recipes") return getMyRecipes().map(r=>({...r, kind:"recipe"}));
+  if(tab==="Brands")     return BRAND_FOODS.map(f=>({...f, kind:"food"}));
   if(tab==="Basics")     return BASIC_FOODS.map(f=>({...f, kind:"food"}));
   return foodHistory().map(f=>({...f, kind:"food"}));
 }
@@ -2093,18 +2946,34 @@ function paintBrowse(){
     b.setAttribute("role","tab"); b.setAttribute("aria-selected", String(t===browseTab));
     b.tabIndex = t===browseTab ? 0 : -1;
     b.textContent=t;
-    b.onclick=()=>{ browseTab=t; DB.set("foodTab",t); paintBrowse(); };
+    b.onclick=()=>{ browseTab=t; browseCat=""; DB.set("foodTab",t); paintBrowse(); };
     b.onkeydown=e=>{
       const i=BROWSE_TABS.indexOf(t); let j=null;
       if(e.key==="ArrowRight") j=(i+1)%BROWSE_TABS.length;
       else if(e.key==="ArrowLeft") j=(i-1+BROWSE_TABS.length)%BROWSE_TABS.length;
       else if(e.key==="Home") j=0; else if(e.key==="End") j=BROWSE_TABS.length-1;
       if(j===null) return;
-      e.preventDefault(); browseTab=BROWSE_TABS[j]; DB.set("foodTab",browseTab); paintBrowse();
+      e.preventDefault(); browseTab=BROWSE_TABS[j]; browseCat=""; DB.set("foodTab",browseTab); paintBrowse();
       $("#ft-"+BROWSE_TABS[j].replace(/\s/g,"")).focus();
     };
     tabs.append(b);
   });
+
+  // Brands and Basics are long enough that a flat list is unusable — offer the
+  // chains and food groups as chips, and let a search cut across all of them.
+  const catHost=$("#browse-cats");
+  const cats = browseTab==="Brands" ? BRAND_CATS : browseTab==="Basics" ? BASIC_CATS : null;
+  if(cats && !q){
+    catHost.hidden=false; catHost.innerHTML="";
+    [["","All"]].concat(cats.map(c=>[c,c])).forEach(([id,label])=>{
+      const c=document.createElement("button");
+      c.type="button"; c.className="chip"+(browseCat===id?" on":"");
+      c.setAttribute("aria-pressed", String(browseCat===id));
+      c.textContent=label;
+      c.onclick=()=>{ browseCat = browseCat===id ? "" : id; paintBrowse(); };
+      catHost.append(c);
+    });
+  }else{ catHost.hidden=true; catHost.innerHTML=""; }
 
   const cap=$("#browse-capture"); cap.innerHTML="";
   captureButtons().forEach(([label,ic,fn])=>{
@@ -2116,12 +2985,13 @@ function paintBrowse(){
   // searching. Without one you are browsing the selected tab.
   let items, heading;
   if(q){
-    items=[].concat(...BROWSE_TABS.map(browseSource))
-      .filter(it=>((it.name||"")+" "+(it.brand||"")+" "+(it.serving||"")).toLowerCase().includes(q));
+    const terms=searchNorm(q).split(" ").filter(Boolean);
+    items=[].concat(...BROWSE_TABS.map(browseSource)).filter(it=>foodMatches(it, terms));
     heading=`${items.length} match${items.length===1?"":"es"}`;
   }else{
     items=browseSource(browseTab);
-    heading=browseTab==="History" ? "Recently logged" : browseTab;
+    if(browseCat && (browseTab==="Brands"||browseTab==="Basics")) items=items.filter(i=>i.cat===browseCat);
+    heading = browseTab==="History" ? "Recently logged" : (browseCat||browseTab);
   }
   if(browseSort==="name") items=[...items].sort((a,b)=>(a.name||"").localeCompare(b.name||""));
   $("#browse-listname").textContent=heading;
@@ -2132,7 +3002,10 @@ function paintBrowse(){
   const note=$("#browse-note");
   if(!q && browseTab==="Basics"){
     note.hidden=false;
-    note.textContent="Standard reference values for a plain serving, not a branded database. Check them against your own label — once you log one you can edit the entry, and it becomes yours in History.";
+    note.textContent="Standard reference values for a plain serving. Check them against your own label — once you log one you can edit the entry, and it becomes yours in History.";
+  }else if(!q && browseTab==="Brands"){
+    note.hidden=false;
+    note.textContent="Chain-published figures for the standard item. Chains reformulate, portions vary by store, and anything you customise changes the numbers — check the ones you eat often, and edit the entry after logging if yours differs.";
   }else if(!q && browseTab==="History" && !items.length){
     note.hidden=false;
     note.textContent="Nothing logged yet. Create a food from its label, or start from the Basics tab.";

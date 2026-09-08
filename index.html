@@ -273,6 +273,21 @@
   .coach-good{border-left-color:var(--success);color:#a4e8cc}
   .coach-info{border-left-color:var(--rim-strong);color:var(--muted)}
 
+  /* ---- Food command bar ---- */
+  .foodbar{position:sticky;top:0;z-index:15;padding:14px 16px;
+    background:rgba(16,11,29,.92);backdrop-filter:blur(16px)}
+  .foodbar-top{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  .foodbar .tabs{margin-top:12px}
+  /* Two columns that fold to one: the ring and where you stand beside it. */
+  .split{display:flex;gap:34px;align-items:flex-start;flex-wrap:wrap}
+  .split-a{flex:0 1 auto}
+  .split-b{flex:1 1 300px;min-width:min(300px,100%)}
+  .typepreview{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  .typepreview > div{border:1px solid var(--rim);background:var(--s2);
+    border-radius:var(--radius-sm);padding:14px}
+  .typepreview .g{font-size:22px;font-weight:600;margin-top:6px}
+  .typepreview .n{font-size:12px;color:var(--muted);margin-top:2px}
+
   /* ---- Carb cycle ---- */
   .switch{display:flex;align-items:center;gap:9px;border:1px solid var(--rim);background:var(--s2);
     padding:5px 12px 5px 6px;border-radius:99px;font-size:12px;color:var(--muted);
@@ -309,10 +324,24 @@
     color:var(--lav);text-transform:uppercase;min-width:96px;text-align:center}
 
   /* ---- Food ---- */
-  .meal-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;
+  .meal-head,.group-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;
     padding:14px 0 8px;border-top:1px solid var(--rim)}
-  .meal-head:first-child{border-top:0;padding-top:0}
-  .meal-head h3{font-size:15px;font-weight:600;margin:0}
+  .meal-head:first-child,.group-head:first-child{border-top:0;padding-top:0}
+  .meal-head h3,.group-head h3{font-size:15px;font-weight:600;margin:0}
+  .group-head.late h3{color:var(--danger)}
+
+  /* ---- Planner / Calendar ---- */
+  .due{font:10px ui-monospace,"Courier New",monospace;letter-spacing:1.2px;padding:3px 9px;
+    border-radius:99px;border:1px solid var(--rim);color:var(--muted);white-space:nowrap;flex:none}
+  .due.now{border-color:var(--rim-strong);color:var(--lav);background:var(--tint)}
+  .due.late{border-color:var(--danger);color:#ffb3c4;background:rgba(255,107,138,.13)}
+  /* Priority is a dot, not a colour on the text — it has to survive being read
+     by someone who cannot tell the two apart, so the tooltip names it too. */
+  .prio{width:7px;height:7px;border-radius:50%;flex:none;margin-top:7px}
+  .prio.high{background:var(--warn);box-shadow:0 0 8px var(--warn)}
+  .prio.low{background:var(--faint)}
+  .upnext-ic{color:var(--accent);flex:none;margin-top:1px}
+  .upnext-ic .i{width:16px;height:16px}
   .meal-kcal{font:11px ui-monospace,"Courier New",monospace;letter-spacing:1.2px;color:var(--muted)}
   .macro-row{display:flex;align-items:center;gap:26px;flex-wrap:wrap}
   .donut{position:relative;width:150px;height:150px;flex:none}
@@ -370,7 +399,9 @@
     padding:12px 0;border-top:1px solid var(--rim)}
   .fieldrow > span{font-size:14px}
   .fieldrow input,.fieldrow select{width:auto;min-width:120px;max-width:190px;text-align:right;padding:8px 10px;font-size:14px}
-  .presets{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+  /* Quick-add buttons are targets, not a banner — cap them so they stay a row
+     of buttons rather than stretching across whatever space is going. */
+  .presets{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px;max-width:340px}
   .note{font-size:12.5px;color:var(--muted);margin:10px 0 0;padding-left:11px;border-left:2px solid var(--rim-strong)}
 
   /* ---- Dialogs ---- */
@@ -443,6 +474,11 @@
     .donut{width:130px;height:130px}
     .fieldrow{flex-wrap:wrap}
     .fieldrow input,.fieldrow select{max-width:none;flex:1}
+    .foodbar{padding:12px}
+    .foodbar-top{gap:10px}
+    .foodbar .tabs{margin-top:10px}
+    .typepreview{grid-template-columns:1fr}
+    .split{gap:22px}
     .subtabs{gap:13px}
     .subtabs button{font-size:13.5px}
     .dialog-scroll{max-height:52vh}
@@ -936,6 +972,70 @@ function addWater(oz, day=todayKey()){ const w=getWater(); w[day]=Math.max(0,(+w
 const getWaterPresets = ()=>DB.get("waterPresets",[8,17,40]);
 
 // ============================================================================
+// SCHEDULE — the dates Planner and Calendar share
+//
+// Both stores predate having a date at all: a task was a title and a done
+// flag, an event carried a free-text "when" that could not be sorted. Both
+// shapes still render — an item without a real date groups on its own rather
+// than being given one it never had.
+// ============================================================================
+const isDateKey = k => /^\d{4}-\d{2}-\d{2}$/.test(k||"");
+/** Whole days from today to `key`; negative means it has already passed. */
+function dayDelta(key, from=todayKey()){
+  return Math.round((new Date(key+"T12:00:00") - new Date(from+"T12:00:00"))/864e5);
+}
+/** How a date reads to a person: Today, Tomorrow, Friday, 24 Sep, 3 days ago. */
+function dateLabel(key){
+  if(!isDateKey(key)) return null;
+  const d=dayDelta(key), dt=new Date(key+"T12:00:00");
+  if(d===0) return "Today";
+  if(d===1) return "Tomorrow";
+  if(d===-1) return "Yesterday";
+  if(d<0) return `${-d} days ago`;
+  if(d<7) return dt.toLocaleDateString(undefined,{weekday:"long"});
+  return dt.toLocaleDateString(undefined,{month:"short",day:"numeric"});
+}
+const BUCKETS = [
+  {id:"past",     label:"Overdue",   late:true},
+  {id:"today",    label:"Today"},
+  {id:"tomorrow", label:"Tomorrow"},
+  {id:"week",     label:"This week"},
+  {id:"later",    label:"Later"},
+  {id:"none",     label:"No date"},
+];
+function bucketOf(key){
+  if(!isDateKey(key)) return "none";
+  const d=dayDelta(key);
+  return d<0 ? "past" : d===0 ? "today" : d===1 ? "tomorrow" : d<7 ? "week" : "later";
+}
+/** Sort key for a date: undated sorts last rather than first. */
+const dateSort = key => isDateKey(key) ? dayDelta(key) : 1e6;
+
+const PRIORITIES = [{id:"high",label:"High"},{id:"",label:"Normal"},{id:"low",label:"Low"}];
+const PRIO_RANK = {high:0, "":1, undefined:1, low:2};
+
+/** Open tasks and scheduled events, in the order they actually come at you. */
+function upNext(limit=5){
+  const items=[];
+  DB.get("tasks",[]).filter(t=>!t.done).forEach(t=>items.push({
+    kind:"task", icon:"planner", title:t.title, notes:t.notes,
+    date:t.due, sort:dateSort(t.due), prio:t.priority,
+  }));
+  DB.get("events",[]).forEach(e=>{
+    // An event with no real date is not "next" — and one already past is not
+    // coming up, however recently it was.
+    if(!isDateKey(e.date) || dayDelta(e.date)<0) return;
+    items.push({kind:"event", icon:"calendar", title:e.title, notes:e.notes,
+      date:e.date, time:e.time, sort:dateSort(e.date)});
+  });
+  items.sort((a,b)=> a.sort-b.sort
+    || (PRIO_RANK[a.prio]??1)-(PRIO_RANK[b.prio]??1)
+    || (a.time||"99:99").localeCompare(b.time||"99:99")
+    || String(a.title).localeCompare(String(b.title)));
+  return items.slice(0,limit);
+}
+
+// ============================================================================
 // FITNESS DOMAIN — ported from the LiftCoach logic, plain functions.
 // ============================================================================
 const DISCIPLINES = [
@@ -1067,6 +1167,15 @@ function runCoach(){
     const d=getDayTypes()[dt];
     out.push([`${d.label} day — ${(+d.calories||0).toLocaleString()} cal, ${+d.carbs||0}g carbs.`,"info"]);
   }
+
+  // What is actually due. Overdue is a warning; today's calendar is context.
+  const openTasks=DB.get("tasks",[]).filter(x=>!x.done);
+  const overdue=openTasks.filter(x=>isDateKey(x.due)&&dayDelta(x.due)<0);
+  if(overdue.length) out.push([`${overdue.length} task${overdue.length===1?"":"s"} overdue.`,"warn"]);
+  const evToday=DB.get("events",[]).filter(x=>x.date===day)
+    .sort((a,b)=>(a.time||"99:99").localeCompare(b.time||"99:99"));
+  if(evToday.length) out.push([
+    `${evToday.length} thing${evToday.length===1?"":"s"} on the calendar today${evToday[0].time?` — ${esc(evToday[0].title)} at ${evToday[0].time}`:""}.`,"info"]);
 
   // Plan for today
   const pt=plannedToday(plan);
@@ -1274,7 +1383,7 @@ function show(name){
   // Landing on a section always starts at today; the day strip travels from
   // there. Without this you could leave Food on last Tuesday and come back to
   // what looks like a day where you ate nothing.
-  if(name!==current) viewDay=todayKey();
+  if(name!==current){ viewDay=todayKey(); foodTab="today"; }
   current = name;
   document.querySelectorAll("nav button").forEach(b=>{ const on=b.dataset.module===name; b.classList.toggle("active",on); if(on) b.setAttribute("aria-current","page"); else b.removeAttribute("aria-current"); });
   $("#crumb").textContent = name.toUpperCase();
@@ -1296,6 +1405,8 @@ function show(name){
   }[name];
   $("#eyebrow").textContent = heads[0]; $("#title").innerHTML = esc(heads[1]).replace(/\.$/,'<span>.</span>'); $("#subtitle").textContent = heads[2];
   if(name==="Command") renderCommand();
+  else if(name==="Planner") renderPlanner();
+  else if(name==="Calendar") renderCalendar();
   else if(name==="Fitness") renderFitness();
   else if(name==="Food") renderFood();
   else if(name==="Steps") renderSteps();
@@ -1332,7 +1443,7 @@ function renderCommand(){
   const day=todayKey(); const foodLog=DB.get("foodLog",{}); const totals=foodTotals(foodLog[day]); const t=getTargets();
   const proteinLeft=Math.max(0,Math.round(t.protein-totals.protein));
   const coach=runCoach();
-  const tasks=DB.get("tasks",[]).filter(e=>!e.done).slice(0,4);
+  const next=upNext(5);
 
   $("#view-command").innerHTML = `
     <div class="hero">
@@ -1370,8 +1481,23 @@ function renderCommand(){
     </div>
 
     <div class="panel">
-      <div class="section-title"><h2>Up next</h2><button class="ghost" onclick="show('Planner')">Planner →</button></div>
-      ${tasks.length ? tasks.map(e=>`<div class="entry"><div class="body"><strong>${esc(e.title)}</strong>${e.notes?`<p>${esc(e.notes)}</p>`:""}</div></div>`).join("") : `<p class="empty">No open tasks. Add one from Planner.</p>`}
+      <div class="section-title"><h2>Up next</h2>
+        <span class="row" style="gap:14px">
+          <button class="ghost" onclick="show('Planner')">Planner →</button>
+          <button class="ghost" onclick="show('Calendar')">Calendar →</button>
+        </span></div>
+      ${next.length ? next.map(n=>{
+        const late=isDateKey(n.date)&&dayDelta(n.date)<0;
+        const now=n.date===todayKey();
+        const when=isDateKey(n.date) ? dateLabel(n.date)+(n.time?` · ${n.time}`:"") : null;
+        const prio=(n.prio==="high"||n.prio==="low")?n.prio:"";
+        return `<div class="entry">
+          <span class="upnext-ic" title="${n.kind==="task"?"Task":"Event"}">${icon(n.icon)}</span>
+          ${prio?`<span class="prio ${prio}" role="img" aria-label="${prio==="high"?"High":"Low"} priority"></span>`:""}
+          <div class="body"><strong>${esc(n.title)}</strong>${n.notes?`<p>${esc(n.notes)}</p>`:""}</div>
+          ${when?`<span class="due${late?" late":now?" now":""}">${esc(when.toUpperCase())}</span>`:""}
+        </div>`; }).join("")
+      : `<p class="empty">Nothing queued. Add a task or an event.</p>`}
     </div>`;
 
   renderActions();
@@ -1454,6 +1580,8 @@ function renderActions(){
 function pickGroup(g){ actionGroup=g; DB.set("actionTab",g); renderActions(); }
 
 function runAction(a){
+  if(a.label==="Add Task"){ show("Planner"); openTask(); return; }
+  if(a.label==="Add Event"){ show("Calendar"); openEvent(); return; }
   if(a.label==="Add Food"||a.label==="Scan Food"){ show("Food"); openFood(a.label==="Scan Food"); return; }
   if(a.label==="Log Lift"){ show("Fitness"); openLift(); return; }
   if(a.label==="Log Session"){ show("Fitness"); openMat(); return; }
@@ -1544,90 +1672,142 @@ function renderFitness(){
 // ============================================================================
 // FOOD VIEW
 // ============================================================================
+// ============================================================================
+// FOOD VIEW
+//
+// Split into three sub-screens behind one command bar. The whole day used to
+// be a single long scroll — the carb-cycle planner sat below the macro ring,
+// the water panel and nothing else could be seen at once. Now the bar carries
+// the day, the day's type and Add food, and the tabs decide what is under it.
+// ============================================================================
+const FOOD_TABS = [["today","Today"],["cycle","Carb cycle"],["nutrition","Nutrition"]];
+let foodTab = "today";
+
 function renderFood(){
   const day=viewDay; const log=DB.get("foodLog",{}); const foods=log[day]||[];
   const totals=foodTotals(foods); const t=getTargets(day);
-  const dayNutrition=sumNutrition(foods);
+  const dayType=dayTypeFor(day), types=getDayTypes();
+  const sp=macroSplit(totals);
 
-  // Group the day by meal. Entries logged before meals existed have no meal,
-  // so they get their own group rather than being silently filed under one.
+  const bar = `
+    <div class="panel foodbar">
+      <div class="foodbar-top">
+        ${dayStrip()}
+        <div class="row" style="gap:12px;flex-wrap:wrap">
+          ${dayType?`<span class="daytype"><b>${esc(types[dayType].label.toUpperCase())} DAY</b> · ${(+types[dayType].calories||0).toLocaleString()} CAL</span>`:""}
+          <button class="primary" id="food-add">Add food</button>
+        </div>
+      </div>
+      <div class="tabs" id="food-tabs" role="tablist" aria-label="Food screens"></div>
+    </div>`;
+
+  let body="";
+  if(foodTab==="today")      body=foodToday(day, foods, totals, t, sp, dayType, types);
+  else if(foodTab==="cycle") body=foodCycle();
+  else                       body=foodNutrition(foods);
+
+  $("#view-food").innerHTML = bar + `<div id="food-panel" role="tabpanel" aria-labelledby="ft-${foodTab}">${body}</div>`;
+
+  // ---- tabs ----
+  const tabs=$("#food-tabs");
+  FOOD_TABS.forEach(([id,label],i)=>{
+    const b=document.createElement("button"); b.type="button"; b.id="ft-"+id;
+    b.setAttribute("role","tab"); b.setAttribute("aria-controls","food-panel");
+    b.setAttribute("aria-selected", String(id===foodTab));
+    b.tabIndex = id===foodTab ? 0 : -1;
+    // The first tab is a screen, but it names a day — so it stops claiming
+    // "Today" when the day strip has travelled somewhere else.
+    b.textContent = id==="today" ? (isToday()?"Today":"That day") : label;
+    b.onclick=()=>{ foodTab=id; renderFood(); };
+    b.onkeydown=e=>{
+      let j=null;
+      if(e.key==="ArrowRight") j=(i+1)%FOOD_TABS.length;
+      else if(e.key==="ArrowLeft") j=(i-1+FOOD_TABS.length)%FOOD_TABS.length;
+      else if(e.key==="Home") j=0; else if(e.key==="End") j=FOOD_TABS.length-1;
+      if(j===null) return;
+      e.preventDefault(); foodTab=FOOD_TABS[j][0]; renderFood(); $("#ft-"+foodTab).focus();
+    };
+    tabs.append(b);
+  });
+
+  daySubtitle("Today against your targets.", "{d} — against your targets.");
+  wireDayStrip($("#view-food"), renderFood);
+  $("#food-add").onclick=()=>openBrowse();
+
+  // ---- per-tab wiring ----
+  if(foodTab==="today"){
+    $("#food-obsidian").onclick=openObsidian;
+    $("#food-targets").onclick=()=>carbCycleOn()?openDayTypes():openTargets();
+    $("#water-settings").onclick=openWaterSettings;
+    $("#water-custom").onclick=openWater;
+    const undo=$("#water-undo");
+    if(undo) undo.onclick=()=>{ const wt=getWater(); delete wt[viewDay]; DB.set("water",wt); renderFood(); toast("Water cleared"); };
+    if($("#food-daytype")) $("#food-daytype").onclick=()=>openDayOverride(day);
+    $("#view-food").querySelectorAll("[data-water]").forEach(b=>b.onclick=()=>{ addWater(+b.dataset.water, viewDay); renderFood(); });
+    $("#view-food").querySelectorAll("[data-addmeal]").forEach(b=>b.onclick=()=>openBrowse(b.dataset.addmeal));
+    $("#view-food").querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>openLoggedEntry(+b.dataset.edit));
+    $("#view-food").querySelectorAll("[data-food]").forEach(b=>b.onclick=()=>{
+      const l=DB.get("foodLog",{}); (l[viewDay]||[]).splice(+b.dataset.food,1); DB.set("foodLog",l);
+      renderFood(); toast("Removed"); });
+  }
+  if(foodTab==="cycle"){
+    $("#cc-toggle").onclick=()=>{ DB.set("carbCycle", !carbCycleOn()); renderFood();
+      toast(carbCycleOn()?"Carb cycling on":"Back to a single target"); };
+    if($("#cc-edit"))  $("#cc-edit").onclick=openDayTypes;
+    if($("#cc-match")) $("#cc-match").onclick=matchTrainingPlan;
+    if($("#cc-day"))   $("#cc-day").onclick=()=>openDayOverride(day);
+    renderCarbWeek();
+  }
+}
+
+/** The day itself: where you stand, what you drank, what you ate. */
+function foodToday(day, foods, totals, t, sp, dayType, types){
+  const w=waterOn(day), wGoal=getWaterGoal(), u=WATER_UNITS[getWaterUnit()];
+  const inUnit=v=>{ const n=v/u.per; return n>=100?Math.round(n):+n.toFixed(n<10?1:0); };
+
   const groups=MEALS.map(m=>({name:m, items:foods.map((f,i)=>({f,i})).filter(x=>x.f.meal===m)}));
   const loose=foods.map((f,i)=>({f,i})).filter(x=>!MEALS.includes(x.f.meal));
   if(loose.length) groups.push({name:"Uncategorised", items:loose, loose:true});
 
-  const w=waterOn(day), wGoal=getWaterGoal(), unit=getWaterUnit(), u=WATER_UNITS[unit];
-  const dayType=dayTypeFor(day), types=getDayTypes();
-  const inUnit=v=>{ const n=v/u.per; return n>=100?Math.round(n):+n.toFixed(n<10?1:0); };
-
-  $("#view-food").innerHTML = `
-    <div class="grid cols-2">
-      <div class="panel">
-        <div class="section-title"><h2>${isToday()?"Today":"That day"}</h2>${dayStrip()}<button class="primary" id="food-add">Add food</button></div>
-        <div class="macro-row">
-          ${donut(totals)}
-          <div class="macro-legend">
-            ${MACROS.map(([k,label,tok])=>{ const sp=macroSplit(totals);
-              return `<div><div class="pct" style="color:var(${tok})">${sp[k]}%</div>
-                <div class="g">${nfmt(totals[k])||0} g</div><div class="n">${label}</div></div>`; }).join("")}
-          </div>
-        </div>
-        <p class="muted" style="margin:16px 0 0">
-          ${totals.calories<=t.calories
-            ? `${Math.round(t.calories-totals.calories).toLocaleString()} calories left of ${t.calories.toLocaleString()}.`
-            : `${Math.round(totals.calories-t.calories).toLocaleString()} calories over ${t.calories.toLocaleString()}.`}
-        </p>
-        ${dayType ? `<div class="row" style="margin-top:12px;gap:12px;flex-wrap:wrap">
-          <span class="daytype"><b>${esc(types[dayType].label.toUpperCase())} DAY</b> · ${(+types[dayType].carbs||0)}G CARBS</span>
-          <button class="ghost" id="food-daytype">Change just this day</button>
-        </div>` : ""}
-        <div class="row" style="margin-top:14px;gap:14px;flex-wrap:wrap">
-          <button class="btn" id="food-obsidian">Import Obsidian</button>
-          <button class="ghost" id="food-targets">${carbCycleOn()?"Edit day types":"Edit targets"}</button>
-        </div>
-      </div>
-
-      <div class="panel">
-        <div class="section-title"><h2>Percent of daily goals</h2></div>
-        ${goalBars(totals,t)}
-        <div class="section-title" style="margin:24px 0 12px"><h2>Water</h2><button class="ghost" id="water-settings">Goal &amp; unit</button></div>
-        <div class="row" style="gap:18px;flex-wrap:wrap">
-          ${ring(inUnit(w), inUnit(wGoal), "WATER", " "+u.label)}
-          <div style="flex:1;min-width:150px">
-            <div class="presets">
-              ${getWaterPresets().map(oz=>`<button class="btn" data-water="${oz}">+${inUnit(oz)}</button>`).join("")}
+  return `
+    <div class="panel">
+      <div class="split">
+        <div class="split-a">
+          <div class="macro-row">
+            ${donut(totals)}
+            <div class="macro-legend">
+              ${MACROS.map(([k,label,tok])=>`<div><div class="pct" style="color:var(${tok})">${sp[k]}%</div>
+                <div class="g">${nfmt(totals[k])||0} g</div><div class="n">${label}</div></div>`).join("")}
             </div>
-            <button class="ghost" id="water-custom" style="margin-top:10px">Enter an amount</button>
-            ${w>0?`<button class="ghost" id="water-undo" style="margin-left:14px">Undo</button>`:""}
           </div>
+          <p class="muted" style="margin:16px 0 0">
+            ${totals.calories<=t.calories
+              ? `${Math.round(t.calories-totals.calories).toLocaleString()} calories left of ${t.calories.toLocaleString()}.`
+              : `${Math.round(totals.calories-t.calories).toLocaleString()} calories over ${t.calories.toLocaleString()}.`}
+            ${dayType?`<button class="ghost" id="food-daytype" style="margin-left:10px">Change this day</button>`:""}
+          </p>
+        </div>
+        <div class="split-b">
+          <p class="eyebrow" style="margin:0 0 12px">Percent of daily goals</p>
+          ${goalBars(totals,t)}
         </div>
       </div>
     </div>
 
     <div class="panel">
-      <div class="section-title">
-        <h2>Carb cycle</h2>
-        <button class="switch" id="cc-toggle" aria-pressed="${carbCycleOn()}">
-          <span class="knob" aria-hidden="true"></span><span>${carbCycleOn()?"On":"Off"}</span>
-        </button>
+      <div class="section-title"><h2>Water</h2><button class="ghost" id="water-settings">Goal &amp; unit</button></div>
+      <div class="row" style="gap:20px;flex-wrap:wrap">
+        ${ring(inUnit(w), inUnit(wGoal), "WATER", " "+u.label)}
+        <div style="flex:1;min-width:170px">
+          <div class="presets">
+            ${getWaterPresets().map(oz=>`<button class="btn" data-water="${oz}">+${inUnit(oz)}</button>`).join("")}
+          </div>
+          <div class="row" style="margin-top:10px;gap:14px">
+            <button class="ghost" id="water-custom">Enter an amount</button>
+            ${w>0?`<button class="ghost" id="water-undo">Undo</button>`:""}
+          </div>
+        </div>
       </div>
-      ${carbCycleOn() ? `
-        <p class="muted" style="font-size:13.5px;margin:0 0 6px">
-          Each day runs its own targets. Protein holds steady; carbs do the swinging.
-          ${carbWeekAverage()!=null?`Averages <strong>${carbWeekAverage().toLocaleString()} cal/day</strong> across the week.`:""}
-        </p>
-        <div id="cc-week"></div>
-        <div class="row" style="margin-top:14px;gap:14px;flex-wrap:wrap">
-          <button class="btn" id="cc-match">Match my training plan</button>
-          <button class="ghost" id="cc-edit">Edit day types</button>
-        </div>`
-      : `
-        <p class="muted" style="font-size:13.5px;margin:0">
-          Turn this on to run a high / mid / low rotation instead of one target every day —
-          ${(+getDayTypes().high.calories).toLocaleString()} on a high day,
-          ${(+getDayTypes().mid.calories).toLocaleString()} mid,
-          ${(+getDayTypes().low.calories).toLocaleString()} low by default, all editable.
-          Your single target set stays where it is and comes back if you turn this off.
-        </p>`}
     </div>
 
     <div class="panel">
@@ -1652,36 +1832,60 @@ function renderFood(){
             </div>`).join("")
           : `<p class="empty" style="padding:6px 0">Nothing logged.</p>`}`;
       }).join("")}
-    </div>
+      <div class="row" style="margin-top:18px;gap:16px;flex-wrap:wrap;padding-top:14px;border-top:1px solid var(--rim)">
+        <button class="btn" id="food-obsidian">Import Obsidian</button>
+        <button class="ghost" id="food-targets">${carbCycleOn()?"Edit day types":"Edit targets"}</button>
+      </div>
+    </div>`;
+}
 
+/** The rotation, on its own screen instead of buried under the day. */
+function foodCycle(){
+  const types=getDayTypes();
+  return `
+    <div class="panel">
+      <div class="section-title">
+        <h2>Carb cycle</h2>
+        <button class="switch" id="cc-toggle" aria-pressed="${carbCycleOn()}">
+          <span class="knob" aria-hidden="true"></span><span>${carbCycleOn()?"On":"Off"}</span>
+        </button>
+      </div>
+      ${carbCycleOn() ? `
+        <p class="muted" style="font-size:13.5px;margin:0 0 4px">
+          Each day runs its own targets. Protein holds steady; carbs do the swinging.
+          ${carbWeekAverage()!=null?`Averages <strong>${carbWeekAverage().toLocaleString()} cal/day</strong> across the week.`:""}
+        </p>
+        <div id="cc-week"></div>
+        <div class="row" style="margin-top:16px;gap:16px;flex-wrap:wrap">
+          <button class="btn" id="cc-match">Match my training plan</button>
+          <button class="ghost" id="cc-edit">Edit day types</button>
+          <button class="ghost" id="cc-day">Change ${isToday()?"today":"this day"}</button>
+        </div>`
+      : `
+        <p class="muted" style="font-size:14px;margin:0 0 16px">
+          Run a high / mid / low rotation instead of one target every day. Your single
+          target set stays where it is and comes back if you turn this off.
+        </p>
+        <div class="typepreview">
+          ${DAY_TYPES.map(k=>`<div>
+            <div class="tag">${esc(types[k].label.toUpperCase())} DAY</div>
+            <div class="g">${(+types[k].calories||0).toLocaleString()}</div>
+            <div class="n">${+types[k].carbs||0}c · ${+types[k].protein||0}p · ${+types[k].fat||0}f</div>
+          </div>`).join("")}
+        </div>`}
+    </div>`;
+}
+
+/** The full label for the day, given the room to be read. */
+function foodNutrition(foods){
+  const n=sumNutrition(foods);
+  return `
     <div class="panel">
       <div class="section-title"><h2>Nutrition facts — ${isToday()?"today":esc(viewDay)}</h2>
-        <button class="ghost" id="nf-toggle" aria-expanded="${DB.get("nfOpen",false)}" aria-controls="nf-body">
-          ${DB.get("nfOpen",false)?"Hide":"Show"}</button></div>
-      <div id="nf-body" ${DB.get("nfOpen",false)?"":"hidden"}>${nutritionFacts(dayNutrition)}</div>
+        <span class="tag">${foods.length} ITEM${foods.length===1?"":"S"}</span></div>
+      ${foods.length ? nutritionFacts(n)
+        : `<p class="empty">Nothing logged, so there is nothing to add up.</p>`}
     </div>`;
-
-  $("#food-add").onclick=()=>openBrowse();
-  $("#food-obsidian").onclick=openObsidian;
-  $("#food-targets").onclick=()=>carbCycleOn()?openDayTypes():openTargets();
-  $("#water-settings").onclick=openWaterSettings;
-  $("#water-custom").onclick=openWater;
-  const undo=$("#water-undo"); if(undo) undo.onclick=()=>{ const wt=getWater(); delete wt[viewDay]; DB.set("water",wt); renderFood(); toast("Water cleared"); };
-  $("#nf-toggle").onclick=()=>{ DB.set("nfOpen",!DB.get("nfOpen",false)); renderFood(); };
-  daySubtitle("Today against your targets.", "{d} — against your targets.");
-  wireDayStrip($("#view-food"), renderFood);
-  $("#cc-toggle").onclick=()=>{ DB.set("carbCycle", !carbCycleOn()); renderFood();
-    toast(carbCycleOn()?"Carb cycling on":"Back to a single target"); };
-  if($("#food-daytype")) $("#food-daytype").onclick=()=>openDayOverride(day);
-  if($("#cc-edit"))  $("#cc-edit").onclick=openDayTypes;
-  if($("#cc-match")) $("#cc-match").onclick=matchTrainingPlan;
-  renderCarbWeek();
-  $("#view-food").querySelectorAll("[data-water]").forEach(b=>b.onclick=()=>{ addWater(+b.dataset.water, viewDay); renderFood(); });
-  $("#view-food").querySelectorAll("[data-addmeal]").forEach(b=>b.onclick=()=>openBrowse(b.dataset.addmeal));
-  $("#view-food").querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>openLoggedEntry(+b.dataset.edit));
-  $("#view-food").querySelectorAll("[data-food]").forEach(b=>b.onclick=()=>{
-    const l=DB.get("foodLog",{}); (l[viewDay]||[]).splice(+b.dataset.food,1); DB.set("foodLog",l);
-    renderFood(); toast("Removed"); });
 }
 
 // ---- The week planner: one row per weekday, three types to choose from ----
@@ -1959,6 +2163,289 @@ function openStepGoal(){
     if(!isFinite(v)||v<=0||v>200000) return;
     DB.set("stepGoal",v); $("#entry-dialog").close(); toast("Goal updated"); renderSteps(); };
   openDialog($("#entry-dialog")); setTimeout(()=>$("#sg-val").focus(),40);
+}
+
+// ============================================================================
+// PLANNER
+// ============================================================================
+let taskFilter = "open";
+
+function renderPlanner(){
+  const all=DB.get("tasks",[]);
+  const open=all.filter(t=>!t.done), done=all.filter(t=>t.done);
+  const list = taskFilter==="done" ? done : taskFilter==="all" ? all : open;
+  const overdue=open.filter(t=>isDateKey(t.due)&&dayDelta(t.due)<0);
+  const dueToday=open.filter(t=>t.due===todayKey());
+
+  // Group into buckets, then order inside each: priority first, then title.
+  const groups=BUCKETS.map(b=>({...b, items:list.filter(t=>!t.done && bucketOf(t.due)===b.id)}))
+    .filter(g=>g.items.length);
+  groups.forEach(g=>g.items.sort((a,b)=>
+    dateSort(a.due)-dateSort(b.due)
+    || (PRIO_RANK[a.priority]??1)-(PRIO_RANK[b.priority]??1)
+    || String(a.title).localeCompare(String(b.title))));
+  const doneShown = taskFilter!=="open" ? done : [];
+
+  $("#view-generic").innerHTML = `
+    <div class="grid cols-2">
+      <div class="panel">
+        <div class="section-title"><h2>Open</h2><button class="primary" id="pl-add">Add task</button></div>
+        <p class="big">${open.length} <span class="muted" style="font-size:15px">open</span></p>
+        <p class="muted" style="margin:2px 0 0">
+          ${overdue.length?`${overdue.length} overdue · `:""}${dueToday.length?`${dueToday.length} due today · `:""}${done.length} done
+        </p>
+      </div>
+      <div class="panel">
+        <div class="section-title"><h2>Show</h2></div>
+        <div class="tabs" id="pl-tabs" role="tablist" aria-label="Which tasks to show"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="section-title"><h2>Tasks</h2><span class="tag">${list.length} SHOWN</span></div>
+      ${groups.length||doneShown.length ? groups.map(g=>`
+        <div class="group-head${g.late?" late":""}"><h3>${esc(g.label)}</h3><span class="meal-kcal">${g.items.length}</span></div>
+        ${g.items.map(t=>taskRow(t)).join("")}`).join("")
+        + (doneShown.length?`<div class="group-head"><h3>Done</h3><span class="meal-kcal">${doneShown.length}</span></div>${doneShown.map(t=>taskRow(t)).join("")}`:"")
+        : `<p class="empty">${taskFilter==="done"?"Nothing finished yet.":"Nothing here. Add a task."}</p>`}
+    </div>`;
+
+  const tabs=$("#pl-tabs");
+  [["open","Open",open.length],["done","Done",done.length],["all","All",all.length]].forEach(([id,label,n],i,arr)=>{
+    const b=document.createElement("button"); b.type="button"; b.id="pl-tab-"+id;
+    b.setAttribute("role","tab"); b.setAttribute("aria-controls","view-generic");
+    b.setAttribute("aria-selected", String(id===taskFilter));
+    b.tabIndex = id===taskFilter ? 0 : -1;
+    b.innerHTML=`${esc(label)}<span class="count">${n}</span>`;
+    b.onclick=()=>{ taskFilter=id; renderPlanner(); };
+    b.onkeydown=e=>{
+      let j=null;
+      if(e.key==="ArrowRight") j=(i+1)%arr.length;
+      else if(e.key==="ArrowLeft") j=(i-1+arr.length)%arr.length;
+      else if(e.key==="Home") j=0; else if(e.key==="End") j=arr.length-1;
+      if(j===null) return;
+      e.preventDefault(); taskFilter=arr[j][0]; renderPlanner(); $("#pl-tab-"+arr[j][0]).focus();
+    };
+    tabs.append(b);
+  });
+
+  $("#pl-add").onclick=()=>openTask();
+  wireListRows("#view-generic", "tasks", renderPlanner, openTask);
+}
+
+function taskRow(t){
+  const label=dateLabel(t.due);
+  const late=isDateKey(t.due)&&dayDelta(t.due)<0&&!t.done;
+  const now=t.due===todayKey()&&!t.done;
+  const prio=(t.priority==="high"||t.priority==="low")?t.priority:"";
+  return `<div class="entry">
+    <button type="button" class="chip check-box${t.done?' on':''}" data-toggle="${esc(t.id)}"
+      aria-pressed="${!!t.done}" aria-label="Mark ${esc(t.title)} ${t.done?"not done":"done"}">${icon("check")}</button>
+    ${prio?`<span class="prio ${prio}" title="${prio==="high"?"High":"Low"} priority" aria-label="${prio==="high"?"High":"Low"} priority" role="img"></span>`:""}
+    <div class="body">
+      <strong style="${t.done?'text-decoration:line-through;color:var(--muted)':''}">${esc(t.title)}</strong>
+      ${t.notes?`<p>${esc(t.notes)}</p>`:""}
+    </div>
+    ${label?`<span class="due${late?" late":now?" now":""}">${esc(label.toUpperCase())}</span>`:""}
+    <button type="button" class="del" data-edit-id="${esc(t.id)}" aria-label="Edit ${esc(t.title)}">${icon("edit")}</button>
+    <button type="button" class="del" data-del="${esc(t.id)}" aria-label="Delete ${esc(t.title)}">${icon("x")}</button>
+  </div>`;
+}
+
+// ============================================================================
+// CALENDAR
+// ============================================================================
+let eventFilter = "upcoming";
+
+function renderCalendar(){
+  const all=DB.get("events",[]);
+  const scheduled=all.filter(e=>isDateKey(e.date));
+  const upcoming=scheduled.filter(e=>dayDelta(e.date)>=0);
+  const past=scheduled.filter(e=>dayDelta(e.date)<0);
+  const unscheduled=all.filter(e=>!isDateKey(e.date));
+
+  const byTime=(a,b)=>dateSort(a.date)-dateSort(b.date)
+    || (a.time||"99:99").localeCompare(b.time||"99:99")
+    || String(a.title).localeCompare(String(b.title));
+
+  let groups=[];
+  if(eventFilter==="past"){
+    groups=[{label:"Earlier", items:[...past].sort((a,b)=>byTime(b,a))}];
+  }else{
+    groups=BUCKETS.filter(b=>b.id!=="past"&&b.id!=="none")
+      .map(b=>({label:b.label, items:upcoming.filter(e=>bucketOf(e.date)===b.id).sort(byTime)}));
+    if(eventFilter==="all") groups.push({label:"Earlier", items:[...past].sort((a,b)=>byTime(b,a))});
+    // Events carried over from before there was a date field keep their
+    // free-text "when" and sit in their own group rather than being guessed at.
+    groups.push({label:"Unscheduled", items:unscheduled});
+  }
+  groups=groups.filter(g=>g.items.length);
+  const shown=groups.reduce((a,g)=>a+g.items.length,0);
+  const next=upcoming.sort(byTime)[0];
+
+  $("#view-generic").innerHTML = `
+    <div class="grid cols-2">
+      <div class="panel">
+        <div class="section-title"><h2>Next up</h2><button class="primary" id="cal-add">Add event</button></div>
+        ${next ? `<p class="big">${esc(next.title)}</p>
+          <p class="muted" style="margin:2px 0 0">${esc(dateLabel(next.date))}${next.time?` · ${esc(next.time)}`:""}</p>`
+        : `<p class="empty">Nothing scheduled.</p>`}
+      </div>
+      <div class="panel">
+        <div class="section-title"><h2>Show</h2></div>
+        <div class="tabs" id="cal-tabs" role="tablist" aria-label="Which events to show"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="section-title"><h2>Events</h2><span class="tag">${shown} SHOWN</span></div>
+      ${groups.length ? groups.map(g=>`
+        <div class="group-head"><h3>${esc(g.label)}</h3><span class="meal-kcal">${g.items.length}</span></div>
+        ${g.items.map(e=>eventRow(e)).join("")}`).join("")
+        : `<p class="empty">${eventFilter==="past"?"Nothing has happened yet.":"Nothing scheduled. Add an event."}</p>`}
+    </div>`;
+
+  const tabs=$("#cal-tabs");
+  [["upcoming","Upcoming",upcoming.length+unscheduled.length],["past","Past",past.length],["all","All",all.length]]
+    .forEach(([id,label,n],i,arr)=>{
+      const b=document.createElement("button"); b.type="button"; b.id="cal-tab-"+id;
+      b.setAttribute("role","tab"); b.setAttribute("aria-controls","view-generic");
+      b.setAttribute("aria-selected", String(id===eventFilter));
+      b.tabIndex = id===eventFilter ? 0 : -1;
+      b.innerHTML=`${esc(label)}<span class="count">${n}</span>`;
+      b.onclick=()=>{ eventFilter=id; renderCalendar(); };
+      b.onkeydown=e=>{
+        let j=null;
+        if(e.key==="ArrowRight") j=(i+1)%arr.length;
+        else if(e.key==="ArrowLeft") j=(i-1+arr.length)%arr.length;
+        else if(e.key==="Home") j=0; else if(e.key==="End") j=arr.length-1;
+        if(j===null) return;
+        e.preventDefault(); eventFilter=arr[j][0]; renderCalendar(); $("#cal-tab-"+arr[j][0]).focus();
+      };
+      tabs.append(b);
+    });
+
+  $("#cal-add").onclick=()=>openEvent();
+  wireListRows("#view-generic", "events", renderCalendar, openEvent);
+}
+
+function eventRow(e){
+  const label=dateLabel(e.date);
+  const now=e.date===todayKey();
+  const when = label ? label + (e.time?` · ${e.time}`:"") : (e.when || "");
+  return `<div class="entry">
+    <div class="body">
+      <strong>${esc(e.title)}</strong>
+      ${e.notes?`<p>${esc(e.notes)}</p>`:""}
+    </div>
+    ${when?`<span class="due${now?" now":""}">${esc(when.toUpperCase())}</span>`:""}
+    <button type="button" class="del" data-edit-id="${esc(e.id)}" aria-label="Edit ${esc(e.title)}">${icon("edit")}</button>
+    <button type="button" class="del" data-del="${esc(e.id)}" aria-label="Delete ${esc(e.title)}">${icon("x")}</button>
+  </div>`;
+}
+
+/** Toggle / edit / delete wiring shared by the two list screens. */
+function wireListRows(root, store, rerender, opener){
+  const host=$(root);
+  host.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{
+    DB.set(store, DB.get(store,[]).filter(x=>x.id!==b.dataset.del)); rerender(); toast("Deleted"); });
+  host.querySelectorAll("[data-edit-id]").forEach(b=>b.onclick=()=>{
+    opener(DB.get(store,[]).find(x=>x.id===b.dataset.editId)); });
+  host.querySelectorAll("[data-toggle]").forEach(b=>b.onclick=()=>{
+    const l=DB.get(store,[]); const e=l.find(x=>x.id===b.dataset.toggle);
+    if(e){ e.done=!e.done; DB.set(store,l); } rerender(); });
+}
+
+// ---- Task capture ----
+function openTask(existing){
+  const t=existing||{};
+  $("#entry-title").textContent = existing ? "Edit task" : "Add task";
+  $("#entry-fields").innerHTML=`
+    <label for="tk-title">Task</label><input id="tk-title" value="${esc(t.title||"")}"/>
+    <label for="tk-due">Due <span class="faint">(optional)</span></label>
+    <input id="tk-due" type="date" value="${esc(isDateKey(t.due)?t.due:"")}"/>
+    <div class="chip-row" style="margin-top:8px">
+      <button type="button" class="btn" data-quick="0">Today</button>
+      <button type="button" class="btn" data-quick="1">Tomorrow</button>
+      <button type="button" class="btn" data-quick="7">Next week</button>
+      <button type="button" class="btn" data-quick="">No date</button>
+    </div>
+    <label>Priority</label><div class="chip-row" id="tk-prio"></div>
+    <label for="tk-notes">Notes <span class="faint">(optional)</span></label>
+    <textarea id="tk-notes">${esc(t.notes||"")}</textarea>`;
+  let prio = (t.priority==="high"||t.priority==="low") ? t.priority : "";
+  const chips=$("#tk-prio");
+  PRIORITIES.forEach(pr=>{
+    const c=document.createElement("button");
+    c.type="button"; c.className="chip"+(prio===pr.id?" on":"");
+    c.setAttribute("aria-pressed", String(prio===pr.id));
+    c.textContent=pr.label;
+    c.onclick=()=>{ prio=pr.id;
+      [...chips.children].forEach(x=>{ x.classList.remove("on"); x.setAttribute("aria-pressed","false"); });
+      c.classList.add("on"); c.setAttribute("aria-pressed","true"); };
+    chips.append(c);
+  });
+  $("#entry-fields").querySelectorAll("[data-quick]").forEach(b=>b.onclick=()=>{
+    const v=b.dataset.quick;
+    if(v===""){ $("#tk-due").value=""; return; }
+    const d=new Date(); d.setDate(d.getDate()+ +v); $("#tk-due").value=todayKey(d);
+  });
+  $("#entry-form").onsubmit=e=>{
+    e.preventDefault();
+    const title=$("#tk-title").value.trim(); if(!title){ $("#tk-title").focus(); return; }
+    const due=$("#tk-due").value;
+    const rec={ id:t.id||uid(), title, notes:$("#tk-notes").value.trim(),
+      due: isDateKey(due)?due:"", priority:prio, done:!!t.done };
+    const l=DB.get("tasks",[]);
+    const i=l.findIndex(x=>x.id===rec.id);
+    if(i>=0) l[i]=rec; else l.unshift(rec);
+    DB.set("tasks",l);
+    $("#entry-dialog").close(); toast(existing?"Task updated":"Task added");
+    if(current==="Planner") renderPlanner(); else if(current==="Command") renderCommand();
+  };
+  openDialog($("#entry-dialog")); setTimeout(()=>$("#tk-title").focus(),40);
+}
+
+// ---- Event capture ----
+function openEvent(existing){
+  const ev=existing||{};
+  $("#entry-title").textContent = existing ? "Edit event" : "Add event";
+  $("#entry-fields").innerHTML=`
+    <label for="ev-title">Event</label><input id="ev-title" value="${esc(ev.title||"")}"/>
+    <div class="row" style="gap:10px">
+      <div style="flex:1"><label for="ev-date">Date</label>
+        <input id="ev-date" type="date" value="${esc(isDateKey(ev.date)?ev.date:"")}"/></div>
+      <div style="flex:1"><label for="ev-time">Time <span class="faint">(optional)</span></label>
+        <input id="ev-time" type="time" value="${esc(ev.time||"")}"/></div>
+    </div>
+    <div class="chip-row" style="margin-top:8px">
+      <button type="button" class="btn" data-quick="0">Today</button>
+      <button type="button" class="btn" data-quick="1">Tomorrow</button>
+      <button type="button" class="btn" data-quick="7">Next week</button>
+    </div>
+    ${ev.when&&!isDateKey(ev.date)?`<p class="note">This event was saved before there was a date field — it said "${esc(ev.when)}". Pick a date and it will sort with the rest.</p>`:""}
+    <label for="ev-notes">Notes <span class="faint">(optional)</span></label>
+    <textarea id="ev-notes">${esc(ev.notes||"")}</textarea>`;
+  $("#entry-fields").querySelectorAll("[data-quick]").forEach(b=>b.onclick=()=>{
+    const d=new Date(); d.setDate(d.getDate()+ +b.dataset.quick); $("#ev-date").value=todayKey(d);
+  });
+  $("#entry-form").onsubmit=e=>{
+    e.preventDefault();
+    const title=$("#ev-title").value.trim(); if(!title){ $("#ev-title").focus(); return; }
+    const date=$("#ev-date").value;
+    const rec={ id:ev.id||uid(), title, notes:$("#ev-notes").value.trim(),
+      date: isDateKey(date)?date:"", time:$("#ev-time").value||"" };
+    // Keep the old free-text "when" only while there is still no real date,
+    // so nothing that was typed once quietly disappears.
+    if(!rec.date && ev.when) rec.when=ev.when;
+    const l=DB.get("events",[]);
+    const i=l.findIndex(x=>x.id===rec.id);
+    if(i>=0) l[i]=rec; else l.unshift(rec);
+    DB.set("events",l);
+    $("#entry-dialog").close(); toast(existing?"Event updated":"Event added");
+    if(current==="Calendar") renderCalendar(); else if(current==="Command") renderCommand();
+  };
+  openDialog($("#entry-dialog")); setTimeout(()=>$("#ev-title").focus(),40);
 }
 
 // ---- GENERIC list sections ----

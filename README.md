@@ -26,10 +26,21 @@ serves `index.html` at `/`). All data is stored locally in the browser under
 - **Steps** — daily goal ring, 7-day chart, and an Apple Shortcut recipe that
   pushes Health's step count in via `?steps=NNNN`.
 
+Food is split into three screens behind one command bar — **Today**, **Carb
+cycle** and **Nutrition** — so the rotation is one tap rather than a scroll,
+and the bar keeps the day, the day's type and Add food in reach on all three.
+
 Food and Steps carry a day strip: step back through the log to review or fix a
 day you missed, and everything you log there — food, water, steps — lands on
 the day you are looking at. Command and the coach always speak about today.
-- **Planner / Calendar / Journal / Reselling / Money** — quick capture lists.
+- **Planner** — tasks with an optional due date and priority, grouped Overdue /
+  Today / Tomorrow / This week / Later / No date, filtered Open / Done / All.
+- **Calendar** — events with a real date and time, grouped chronologically and
+  filtered Upcoming / Past / All.
+- **Journal / Reselling / Money** — quick capture lists.
+
+Command's **Up next** merges open tasks and scheduled events into one ordered
+list, soonest first, and the coach counts anything overdue.
 
 ## Obsidian
 Paste daily notes into the importer (Fitness → Import Obsidian) and it reads

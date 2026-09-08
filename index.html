@@ -562,13 +562,14 @@
   <label class="sr-only" for="browse-search">Search foods</label>
   <input id="browse-search" type="search" autocomplete="off" placeholder="Search foods, brands, flavors…" />
   <div class="subtabs" id="browse-tabs" role="tablist" aria-label="Food sources"></div>
+  <div class="chip-row" id="browse-cats" hidden style="margin:14px 0 0;max-height:74px;overflow:auto"></div>
   <div class="capture" id="browse-capture"></div>
   <div class="section-title" style="margin:4px 0 8px">
     <h2 id="browse-listname" style="font-size:15px">Recently logged</h2>
     <button type="button" class="ghost" id="browse-sort"></button>
   </div>
+  <p class="note" id="browse-note" hidden style="margin:0 0 10px"></p>
   <div class="picklist" id="browse-list" role="tabpanel"></div>
-  <p class="note" id="browse-note" hidden></p>
 </dialog>
 
 <!-- Food detail: servings, macros, percent of goals, full nutrition facts -->
@@ -873,52 +874,403 @@ function foodHistory(){
   return out;
 }
 
-// A small set of single-ingredient staples so the first search is not empty.
-// These are standard reference values per the serving shown, NOT a branded
-// database — check them against your own label, and edit after logging if
-// your product differs. Anything you log becomes a history entry you own.
-const BASIC_FOODS = [
-  ["Chicken breast, cooked","4 oz",187,35,0,4],
-  ["Ground beef, 93/7, cooked","4 oz",195,29,0,10],
-  ["Ground turkey, 93/7, cooked","4 oz",213,27,0,11],
-  ["Sirloin steak, cooked","4 oz",228,34,0,9],
-  ["Salmon, cooked","4 oz",233,25,0,14],
-  ["Tuna, canned in water","3 oz",99,22,0,0.7],
-  ["Shrimp, cooked","4 oz",112,24,1.4,0.6],
-  ["Egg, large","1 egg",72,6.3,0.4,4.8],
-  ["Egg white, large","1 white",17,3.6,0.2,0.1],
-  ["Whey protein","1 scoop (30g)",120,24,3,1.5],
-  ["Greek yogurt, plain nonfat","1 cup",133,23,9,0.7],
-  ["Cottage cheese, 2%","1 cup",183,24,9,5],
-  ["Milk, whole","1 cup",149,7.7,12,8],
-  ["Milk, skim","1 cup",83,8.3,12,0.2],
-  ["Cheddar cheese","1 oz",114,7,0.4,9.4],
-  ["White rice, cooked","1 cup",205,4.3,45,0.4],
-  ["Brown rice, cooked","1 cup",218,5,46,1.6],
-  ["Quinoa, cooked","1 cup",222,8,39,3.6],
-  ["Pasta, cooked","1 cup",220,8,43,1.3],
-  ["Rolled oats, dry","1/2 cup (40g)",150,5,27,3],
-  ["Bread, whole wheat","1 slice",81,4,14,1.1],
-  ["Tortilla, flour 8in","1 tortilla",144,4,24,3.5],
-  ["Potato, baked with skin","1 medium",161,4.3,37,0.2],
-  ["Sweet potato, baked","1 medium",103,2.3,24,0.2],
-  ["Black beans, cooked","1 cup",227,15,41,0.9],
-  ["Broccoli, cooked","1 cup",55,3.7,11,0.6],
-  ["Spinach, raw","1 cup",7,0.9,1.1,0.1],
-  ["Avocado","1/2 medium",114,1.3,6,10.5],
-  ["Banana","1 medium",105,1.3,27,0.4],
-  ["Apple","1 medium",95,0.5,25,0.3],
-  ["Blueberries","1 cup",84,1.1,21,0.5],
-  ["Orange juice","1 cup",112,1.7,26,0.5],
-  ["Peanut butter","2 tbsp",190,7,7,16],
-  ["Almonds","1 oz",164,6,6,14],
-  ["Olive oil","1 tbsp",119,0,0,13.5],
-  ["Butter","1 tbsp",102,0.1,0,11.5],
-  ["Honey","1 tbsp",64,0,17,0],
-].map(([name,serving,calories,protein,carbs,fat],i)=>({
-  id:"b"+i, name, serving, brand:"Basics", basic:true,
-  per:{calories,protein,carbs,fat},
-}));
+// A reference set so searching for what you actually eat finds something.
+// These are STANDARD REFERENCE VALUES for a plain serving and CHAIN-PUBLISHED
+// figures for the branded items — not a live database. Chains reformulate,
+// portions vary by store, and anything you customise changes the numbers. Check
+// the ones you eat often against the label or the chain's own nutrition page;
+// once you log one it becomes an entry you own and can correct.
+//   [name, serving, calories, protein, carbs, fat]
+const BASIC_ROWS = {
+  "Protein": [
+    ["Chicken breast, cooked","4 oz",187,35,0,4],
+    ["Chicken thigh, cooked","4 oz",240,29,0,13],
+    ["Ground chicken, cooked","4 oz",200,24,0,11],
+    ["Ground beef, 93/7, cooked","4 oz",195,29,0,10],
+    ["Ground beef, 80/20, cooked","4 oz",287,26,0,20],
+    ["Ground turkey, 93/7, cooked","4 oz",213,27,0,11],
+    ["Sirloin steak, cooked","4 oz",228,34,0,9],
+    ["Ribeye steak, cooked","4 oz",310,28,0,22],
+    ["Pork chop, cooked","4 oz",230,32,0,11],
+    ["Bacon","2 slices",80,6,0,6],
+    ["Turkey bacon","2 slices",60,4,1,4],
+    ["Deli turkey breast","2 oz",60,11,2,1],
+    ["Ham, deli","2 oz",70,10,2,2],
+    ["Beef jerky","1 oz",80,11,7,1],
+    ["Salmon, cooked","4 oz",233,25,0,14],
+    ["Tilapia, cooked","4 oz",145,30,0,3],
+    ["Cod, cooked","4 oz",120,26,0,1],
+    ["Tuna, canned in water","3 oz",99,22,0,0.7],
+    ["Salmon, canned","3 oz",120,17,0,5],
+    ["Shrimp, cooked","4 oz",112,24,1.4,0.6],
+    ["Scallops, cooked","4 oz",130,24,6,1],
+    ["Egg, large","1 egg",72,6.3,0.4,4.8],
+    ["Egg white, large","1 white",17,3.6,0.2,0.1],
+    ["Egg whites, carton","1/2 cup",63,13,1,0],
+    ["Tofu, firm","4 oz",90,10,3,5],
+    ["Edamame, shelled","1 cup",190,18,14,8],
+  ],
+  "Dairy": [
+    ["Whey protein","1 scoop (30g)",120,24,3,1.5],
+    ["Greek yogurt, plain nonfat","1 cup",133,23,9,0.7],
+    ["Cottage cheese, 2%","1 cup",183,24,9,5],
+    ["Cottage cheese, 4%","1 cup",220,25,8,10],
+    ["Milk, whole","1 cup",149,7.7,12,8],
+    ["Milk, skim","1 cup",83,8.3,12,0.2],
+    ["Almond milk, unsweetened","1 cup",30,1,1,2.5],
+    ["Oat milk","1 cup",120,3,16,5],
+    ["Soy milk, unsweetened","1 cup",80,7,4,4],
+    ["Cheddar cheese","1 oz",114,7,0.4,9.4],
+    ["Mozzarella, part-skim","1 oz",85,7,1,6],
+    ["Parmesan, grated","1 tbsp",22,2,0.2,1.4],
+    ["Feta cheese","1 oz",75,4,1,6],
+    ["Cream cheese","1 tbsp",50,1,1,5],
+  ],
+  "Carbs": [
+    ["White rice, cooked","1 cup",205,4.3,45,0.4],
+    ["Brown rice, cooked","1 cup",218,5,46,1.6],
+    ["Quinoa, cooked","1 cup",222,8,39,3.6],
+    ["Pasta, cooked","1 cup",220,8,43,1.3],
+    ["Whole wheat pasta, cooked","1 cup",174,7.5,37,0.8],
+    ["Protein pasta, cooked","1 cup",190,14,35,2],
+    ["Couscous, cooked","1 cup",176,6,36,0.3],
+    ["Rolled oats, dry","1/2 cup (40g)",150,5,27,3],
+    ["Cream of rice, dry","1/4 cup",160,3,38,0],
+    ["Bread, whole wheat","1 slice",81,4,14,1.1],
+    ["Bread, white","1 slice",79,2.7,15,1],
+    ["Bagel, plain","1 medium",270,11,53,1.5],
+    ["English muffin","1 muffin",134,5,26,1],
+    ["Pita, whole wheat","1 large",170,6,35,1.7],
+    ["Tortilla, flour 8in","1 tortilla",144,4,24,3.5],
+    ["Tortilla, corn","1 tortilla",52,1.4,11,0.7],
+    ["Potato, baked with skin","1 medium",161,4.3,37,0.2],
+    ["Sweet potato, baked","1 medium",103,2.3,24,0.2],
+    ["Cheerios","1 cup",100,3,20,2],
+    ["Granola","1/2 cup",210,5,36,6],
+    ["Pancake","1 medium",90,2,15,2.5],
+    ["Waffle, frozen","1 waffle",100,2,15,3],
+  ],
+  "Legumes": [
+    ["Black beans, cooked","1 cup",227,15,41,0.9],
+    ["Kidney beans, cooked","1 cup",225,15,40,0.9],
+    ["Chickpeas, cooked","1 cup",269,15,45,4],
+    ["Lentils, cooked","1 cup",230,18,40,0.8],
+    ["Refried beans","1/2 cup",120,7,20,2],
+  ],
+  "Fruit": [
+    ["Banana","1 medium",105,1.3,27,0.4],
+    ["Apple","1 medium",95,0.5,25,0.3],
+    ["Orange","1 medium",62,1.2,15,0.2],
+    ["Blueberries","1 cup",84,1.1,21,0.5],
+    ["Strawberries","1 cup",49,1,12,0.5],
+    ["Grapes","1 cup",104,1.1,27,0.2],
+    ["Pineapple","1 cup",82,0.9,22,0.2],
+    ["Mango","1 cup",99,1.4,25,0.6],
+    ["Watermelon","1 cup",46,0.9,11,0.2],
+    ["Peach","1 medium",59,1.4,14,0.4],
+    ["Pear","1 medium",101,0.6,27,0.2],
+    ["Raisins","1/4 cup",108,1.1,29,0.2],
+    ["Avocado","1/2 medium",114,1.3,6,10.5],
+  ],
+  "Vegetables": [
+    ["Broccoli, cooked","1 cup",55,3.7,11,0.6],
+    ["Spinach, raw","1 cup",7,0.9,1.1,0.1],
+    ["Kale, raw","1 cup",33,2.9,6,0.6],
+    ["Romaine lettuce","1 cup",8,0.6,1.5,0.1],
+    ["Carrots, raw","1 cup",52,1.2,12,0.3],
+    ["Bell pepper","1 medium",24,1,6,0.2],
+    ["Onion","1/2 cup",32,0.9,7,0.1],
+    ["Tomato","1 medium",22,1.1,4.8,0.2],
+    ["Cucumber","1 cup",16,0.7,3.8,0.1],
+    ["Zucchini, cooked","1 cup",27,2,5,0.5],
+    ["Asparagus, cooked","1 cup",40,4.3,7,0.4],
+    ["Green beans, cooked","1 cup",44,2.4,10,0.4],
+    ["Corn","1 cup",143,5,31,2.2],
+    ["Peas, cooked","1 cup",134,8.6,25,0.4],
+    ["Mushrooms, raw","1 cup",15,2.2,2.3,0.2],
+    ["Cauliflower, cooked","1 cup",29,2.3,5,0.6],
+    ["Brussels sprouts, cooked","1 cup",56,4,11,0.8],
+  ],
+  "Fats": [
+    ["Peanut butter","2 tbsp",190,7,7,16],
+    ["Almond butter","2 tbsp",196,7,6,18],
+    ["Almonds","1 oz",164,6,6,14],
+    ["Peanuts","1 oz",161,7,5,14],
+    ["Cashews","1 oz",157,5,9,12],
+    ["Walnuts","1 oz",185,4,4,18],
+    ["Chia seeds","1 tbsp",58,2,5,3.7],
+    ["Ground flaxseed","1 tbsp",37,1.3,2,3],
+    ["Olive oil","1 tbsp",119,0,0,13.5],
+    ["Coconut oil","1 tbsp",121,0,0,13.5],
+    ["Butter","1 tbsp",102,0.1,0,11.5],
+  ],
+  "Condiments": [
+    ["Mayonnaise","1 tbsp",94,0.1,0.1,10],
+    ["Ketchup","1 tbsp",19,0.2,4.7,0],
+    ["Mustard","1 tsp",3,0.2,0.3,0.2],
+    ["BBQ sauce","2 tbsp",70,0,17,0],
+    ["Ranch dressing","2 tbsp",129,0.4,2,13],
+    ["Soy sauce","1 tbsp",9,1,1,0],
+    ["Sriracha","1 tsp",5,0,1,0],
+    ["Hot sauce","1 tsp",1,0,0,0],
+    ["Honey","1 tbsp",64,0,17,0],
+    ["Maple syrup","1 tbsp",52,0,13,0],
+    ["Sugar","1 tsp",16,0,4,0],
+  ],
+  "Drinks": [
+    ["Coffee, black","8 fl oz",2,0.3,0,0],
+    ["Green tea","8 fl oz",2,0,0,0],
+    ["Orange juice","1 cup",112,1.7,26,0.5],
+    ["Gatorade","20 fl oz",140,0,36,0],
+    ["Diet soda","12 fl oz",0,0,0,0],
+    ["Soda, cola","12 fl oz",140,0,39,0],
+    ["Beer, regular","12 fl oz",153,1.6,13,0],
+    ["Wine, red","5 fl oz",125,0.1,4,0],
+  ],
+};
+
+// Chain-published values for flagship US menu items, grouped by where you buy
+// them. Same caveat as above, more strongly: a burger built your way is not
+// the burger on the poster.
+//   [name, serving, calories, protein, carbs, fat]
+const BRAND_ROWS = {
+  "McDonald's": [
+    ["Big Mac","1 burger",563,26,45,33],
+    ["Quarter Pounder with Cheese","1 burger",520,30,42,26],
+    ["Double Quarter Pounder with Cheese","1 burger",740,48,43,43],
+    ["Cheeseburger","1 burger",300,15,32,13],
+    ["Hamburger","1 burger",250,12,31,9],
+    ["McDouble","1 burger",400,22,33,20],
+    ["McChicken","1 sandwich",400,14,39,21],
+    ["Filet-O-Fish","1 sandwich",390,16,39,19],
+    ["Chicken McNuggets, 6 pc","6 pieces",250,14,15,15],
+    ["Chicken McNuggets, 10 pc","10 pieces",410,23,25,24],
+    ["French Fries, medium","1 medium",320,5,43,15],
+    ["French Fries, large","1 large",480,7,64,23],
+    ["Hash Browns","1 piece",140,1,17,8],
+    ["Egg McMuffin","1 sandwich",310,17,30,13],
+    ["Sausage McMuffin with Egg","1 sandwich",480,21,30,31],
+    ["Sausage Burrito","1 burrito",310,13,26,17],
+    ["Hotcakes","3 hotcakes",580,9,102,15],
+    ["Big Breakfast","1 platter",740,25,51,48],
+    ["Vanilla Cone","1 cone",200,5,32,5],
+    ["McFlurry with OREO","1 regular",510,12,80,16],
+  ],
+  "Chick-fil-A": [
+    ["Chicken Sandwich","1 sandwich",440,29,41,19],
+    ["Spicy Chicken Sandwich","1 sandwich",450,29,42,20],
+    ["Deluxe Chicken Sandwich","1 sandwich",490,32,43,23],
+    ["Grilled Chicken Sandwich","1 sandwich",390,28,44,12],
+    ["Nuggets, 8 ct","8 pieces",250,27,11,11],
+    ["Nuggets, 12 ct","12 pieces",380,40,16,17],
+    ["Grilled Nuggets, 8 ct","8 pieces",130,25,1,3],
+    ["Grilled Nuggets, 12 ct","12 pieces",200,38,2,5],
+    ["Chick-n-Strips, 3 ct","3 strips",310,29,14,15],
+    ["Waffle Potato Fries, medium","1 medium",420,5,45,24],
+    ["Mac & Cheese, small","1 small",270,12,24,14],
+    ["Cobb Salad, no dressing","1 salad",510,40,27,27],
+    ["Grilled Chicken Cool Wrap","1 wrap",660,42,47,34],
+  ],
+  "Chipotle": [
+    ["Chicken","4 oz",180,32,0,7],
+    ["Steak","4 oz",150,21,1,6],
+    ["Barbacoa","4 oz",170,24,2,7],
+    ["Carnitas","4 oz",210,23,0,12],
+    ["Sofritas","4 oz",150,8,9,10],
+    ["White Rice","4 oz",210,4,40,4],
+    ["Brown Rice","4 oz",210,4,36,6],
+    ["Black Beans","4 oz",130,8,22,2],
+    ["Pinto Beans","4 oz",130,8,21,2],
+    ["Fajita Veggies","2.5 oz",20,1,5,0],
+    ["Fresh Tomato Salsa","3.5 oz",25,1,4,0],
+    ["Roasted Chili-Corn Salsa","3.5 oz",80,3,16,2],
+    ["Monterey Jack Cheese","1 oz",110,6,1,8],
+    ["Sour Cream","2 oz",110,2,2,9],
+    ["Guacamole","4 oz",230,2,8,22],
+    ["Queso Blanco","2 oz",120,6,4,9],
+    ["Flour Tortilla, burrito","1 tortilla",320,8,50,9],
+    ["Chips","4 oz",540,7,73,25],
+  ],
+  "Taco Bell": [
+    ["Crunchy Taco","1 taco",170,8,13,10],
+    ["Soft Taco, Beef","1 taco",180,9,18,9],
+    ["Doritos Locos Taco, Nacho Cheese","1 taco",170,8,13,10],
+    ["Crunchwrap Supreme","1 item",530,16,71,21],
+    ["Bean Burrito","1 burrito",350,13,54,9],
+    ["Burrito Supreme, Beef","1 burrito",390,16,51,14],
+    ["Chicken Quesadilla","1 quesadilla",510,26,38,28],
+    ["Cheesy Gordita Crunch","1 item",500,20,41,28],
+    ["Chalupa Supreme, Beef","1 item",350,13,30,20],
+    ["Nachos BellGrande","1 order",740,17,82,38],
+    ["Power Menu Bowl, Chicken","1 bowl",470,26,50,19],
+    ["Black Beans and Rice","1 side",170,5,27,4],
+    ["Cinnamon Twists","1 order",170,1,27,6],
+  ],
+  "Subway": [
+    ["6\" Turkey Breast","6 inch",280,18,46,4],
+    ["6\" Oven Roasted Chicken","6 inch",320,25,45,5],
+    ["6\" Rotisserie-Style Chicken","6 inch",350,27,45,7],
+    ["6\" Italian B.M.T.","6 inch",410,20,46,16],
+    ["6\" Meatball Marinara","6 inch",480,21,61,18],
+    ["6\" Tuna","6 inch",480,20,44,25],
+    ["6\" Steak & Cheese","6 inch",380,26,45,10],
+    ["6\" Veggie Delite","6 inch",230,8,44,2],
+    ["Footlong Turkey Breast","12 inch",560,36,92,8],
+    ["Footlong Oven Roasted Chicken","12 inch",640,50,90,10],
+  ],
+  "Wendy's": [
+    ["Dave's Single","1 burger",590,29,39,34],
+    ["Dave's Double","1 burger",810,48,40,51],
+    ["Jr. Bacon Cheeseburger","1 burger",380,19,27,21],
+    ["Spicy Chicken Sandwich","1 sandwich",500,28,50,20],
+    ["Homestyle Chicken Sandwich","1 sandwich",500,28,50,21],
+    ["Grilled Chicken Sandwich","1 sandwich",370,34,37,9],
+    ["Chicken Nuggets, 4 pc","4 pieces",170,9,10,11],
+    ["Chicken Nuggets, 10 pc","10 pieces",420,22,24,26],
+    ["Natural-Cut Fries, medium","1 medium",350,5,47,16],
+    ["Chili, small","1 small",240,18,23,10],
+    ["Baked Potato, plain","1 potato",270,7,61,0],
+    ["Frosty, small chocolate","1 small",350,9,58,9],
+  ],
+  "Burger King": [
+    ["Whopper","1 burger",670,31,51,40],
+    ["Whopper with Cheese","1 burger",760,35,52,47],
+    ["Double Whopper","1 burger",900,48,51,58],
+    ["Cheeseburger","1 burger",280,15,27,13],
+    ["Original Chicken Sandwich","1 sandwich",660,28,51,40],
+    ["Chicken Fries, 9 pc","9 pieces",280,15,21,15],
+    ["French Fries, medium","1 medium",380,4,53,17],
+    ["Croissan'wich, Sausage Egg & Cheese","1 sandwich",500,19,27,35],
+  ],
+  "Starbucks": [
+    ["Caffè Americano, grande","16 fl oz",15,1,3,0],
+    ["Pike Place Roast, grande","16 fl oz",5,1,0,0],
+    ["Cold Brew, grande, black","16 fl oz",5,0,0,0],
+    ["Caffè Latte, grande, 2%","16 fl oz",190,13,19,7],
+    ["Cappuccino, grande, 2%","16 fl oz",140,9,14,5],
+    ["Vanilla Latte, grande, 2%","16 fl oz",250,12,35,6],
+    ["Caramel Macchiato, grande, 2%","16 fl oz",250,10,35,7],
+    ["Caffè Mocha, grande, 2% with whip","16 fl oz",370,14,44,15],
+    ["Java Chip Frappuccino, grande","16 fl oz",440,6,66,18],
+    ["Pumpkin Spice Latte, grande, 2% with whip","16 fl oz",390,14,52,14],
+    ["Bacon, Gouda & Egg Sandwich","1 sandwich",360,18,32,18],
+    ["Spinach, Feta & Egg White Wrap","1 wrap",290,20,34,8],
+    ["Turkey Bacon, Cheddar & Egg White Sandwich","1 sandwich",230,17,28,5],
+    ["Bacon & Gruyère Egg Bites","2 bites",300,19,9,20],
+  ],
+  "Dunkin'": [
+    ["Glazed Donut","1 donut",240,4,29,12],
+    ["Boston Kreme Donut","1 donut",300,4,40,14],
+    ["Iced Coffee, medium, black","24 fl oz",10,0,2,0],
+    ["Sausage, Egg & Cheese Croissant","1 sandwich",700,24,40,49],
+    ["Wake-Up Wrap, Bacon Egg & Cheese","1 wrap",200,10,14,11],
+  ],
+  "Popeyes": [
+    ["Classic Chicken Sandwich","1 sandwich",700,28,50,42],
+    ["Spicy Chicken Sandwich","1 sandwich",700,28,50,42],
+    ["Handcrafted Chicken Tender","1 tender",130,11,8,6],
+    ["Red Beans & Rice, regular","1 regular",230,7,31,9],
+    ["Cajun Fries, regular","1 regular",260,4,33,13],
+    ["Biscuit","1 biscuit",220,3,26,12],
+  ],
+  "KFC": [
+    ["Original Recipe Breast","1 piece",390,39,11,21],
+    ["Original Recipe Thigh","1 piece",280,19,8,19],
+    ["Original Recipe Drumstick","1 piece",130,12,4,8],
+    ["Extra Crispy Breast","1 piece",530,35,20,35],
+    ["Famous Bowl","1 bowl",720,26,80,34],
+    ["Mashed Potatoes with Gravy","1 individual",130,2,20,4],
+    ["Coleslaw","1 individual",170,1,22,9],
+    ["Biscuit","1 biscuit",180,4,22,9],
+  ],
+  "Panda Express": [
+    ["Orange Chicken","1 serving",490,25,51,23],
+    ["Beijing Beef","1 serving",470,14,46,26],
+    ["Broccoli Beef","1 serving",150,9,13,7],
+    ["Kung Pao Chicken","1 serving",290,16,14,19],
+    ["Grilled Teriyaki Chicken","1 serving",300,36,8,13],
+    ["String Bean Chicken Breast","1 serving",190,14,13,9],
+    ["Honey Walnut Shrimp","1 serving",360,13,35,23],
+    ["Chow Mein","1 side",510,13,80,20],
+    ["Fried Rice","1 side",520,11,85,16],
+    ["White Steamed Rice","1 side",380,7,87,0],
+    ["Super Greens","1 side",90,6,10,3],
+    ["Cream Cheese Rangoon","3 pieces",190,5,24,8],
+  ],
+  "In-N-Out": [
+    ["Hamburger with onion","1 burger",390,16,39,19],
+    ["Cheeseburger with onion","1 burger",480,22,39,27],
+    ["Double-Double","1 burger",670,37,39,41],
+    ["Double-Double, Protein Style","1 burger",520,33,11,39],
+    ["French Fries","1 order",370,7,54,15],
+    ["Chocolate Shake","15 fl oz",590,9,83,25],
+  ],
+  "Five Guys": [
+    ["Hamburger","1 burger",700,39,39,43],
+    ["Cheeseburger","1 burger",840,47,40,55],
+    ["Bacon Cheeseburger","1 burger",920,51,40,62],
+    ["Little Hamburger","1 burger",480,23,39,26],
+    ["Fries, regular","1 regular",953,15,131,41],
+    ["Fries, little","1 little",526,8,72,23],
+  ],
+  "Arby's": [
+    ["Classic Roast Beef","1 sandwich",360,23,37,14],
+    ["Beef 'n Cheddar Classic","1 sandwich",450,23,45,20],
+    ["Curly Fries, medium","1 medium",410,5,50,21],
+  ],
+  "Domino's": [
+    ["Hand Tossed Cheese, medium","1 slice",200,8,26,7],
+    ["Hand Tossed Pepperoni, medium","1 slice",220,9,26,9],
+  ],
+  "Pizza Hut": [
+    ["Pan Cheese Pizza, medium","1 slice",280,12,28,13],
+    ["Pan Pepperoni Pizza, medium","1 slice",300,12,28,15],
+    ["Personal Pan Pepperoni","1 pizza",620,25,66,28],
+  ],
+  "Raising Cane's": [
+    ["Chicken Finger","1 finger",130,12,6,6],
+    ["Cane's Sauce","1 serving",190,0,3,19],
+    ["Box Combo","1 combo",1190,47,111,62],
+  ],
+  "Shake Shack": [
+    ["ShackBurger, single","1 burger",530,30,40,30],
+    ["Crinkle Cut Fries","1 order",470,6,58,23],
+  ],
+  "Packaged": [
+    ["Quest — Quest Bar, Chocolate Chip Cookie Dough","1 bar",190,21,21,8],
+    ["Pure Protein — Pure Protein Bar, Chocolate Peanut Butter","1 bar",180,20,17,5],
+    ["RXBAR — RXBAR, Chocolate Sea Salt","1 bar",210,12,24,9],
+    ["Clif — Clif Bar, Chocolate Chip","1 bar",250,9,45,5],
+    ["Premier Protein — Premier Protein Shake","11 fl oz",160,30,5,3],
+    ["Fairlife — Core Power 26g","14 fl oz",170,26,9,3.5],
+    ["Fairlife — Core Power Elite 42g","14 fl oz",230,42,8,4.5],
+    ["Optimum Nutrition — Gold Standard Whey","1 scoop",120,24,3,1],
+    ["Chobani — Greek Yogurt, Plain Nonfat","5.3 oz",90,16,6,0],
+    ["Dannon — Oikos Triple Zero, Vanilla","5.3 oz",120,15,15,0],
+    ["Kodiak Cakes — Power Cakes Mix","1/2 cup dry",190,14,30,2],
+  ],
+};
+
+/** Flatten a grouped table into the food shape the browser already speaks. */
+function flattenRows(table, brandIsCategory){
+  const out=[];
+  Object.keys(table).forEach(cat=>{
+    table[cat].forEach(([name,serving,calories,protein,carbs,fat],i)=>{
+      out.push({
+        id:(brandIsCategory?"br":"bs")+"-"+cat.replace(/\W/g,"")+"-"+i,
+        name, serving, cat,
+        brand: brandIsCategory ? cat : "Basics",
+        reference: true,
+        per:{calories,protein,carbs,fat},
+      });
+    });
+  });
+  return out;
+}
+const BASIC_FOODS = flattenRows(BASIC_ROWS, false);
+const BRAND_FOODS = flattenRows(BRAND_ROWS, true);
+const BASIC_CATS  = Object.keys(BASIC_ROWS);
+const BRAND_CATS  = Object.keys(BRAND_ROWS);
 
 // ---- The day being viewed ----
 //
@@ -954,7 +1306,6 @@ function daySubtitle(todayText, pastText){
     : pastText.replace("{d}", new Date(viewDay+"T12:00:00")
         .toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"}));
 }
-
 /** Wire a rendered day strip to a re-render of the screen it sits on. */
 function wireDayStrip(root, rerender){
   root.querySelectorAll("[data-day]").forEach(b=>b.onclick=()=>{ setViewDay(+b.dataset.day); rerender(); });
@@ -2511,20 +2862,35 @@ function openEntry(module){
 // count. Typing a food's nutrition is a once-per-food job; after that it is
 // two taps.
 // ============================================================================
-const BROWSE_TABS = ["History","My Meals","My Recipes","My Foods","Basics"];
+const BROWSE_TABS = ["History","My Meals","My Recipes","My Foods","Brands","Basics"];
 let browseTab = BROWSE_TABS.includes(DB.get("foodTab","History")) ? DB.get("foodTab","History") : "History";
 let browseMeal = null;
 let browseSort = "recent";
+let browseCat = "";   // narrows the Brands / Basics tabs to one chain or group
 
 /** Total nutrition of a saved meal or recipe (all its items, as entered). */
 const itemsNutrition = m => sumNutrition((m.items||[]).map(it=>({nutrition:scaleNutrition(it.per, it.servings||1)})));
 /** A recipe's nutrition for ONE serving of it. */
 const recipePer = r => scaleNutrition(itemsNutrition(r), 1/Math.max(1, +r.servings||1));
 
+/**
+ * Search has to cope with how people actually type: "chipotle chicken" when
+ * the item is named Chicken and the brand is Chipotle, "mcdonalds fries" in
+ * either order, "chickfila" without the punctuation. So terms are matched
+ * independently against a punctuation-stripped haystack, and every term has
+ * to land somewhere — order and apostrophes stop mattering.
+ */
+const searchNorm = v => String(v||"").toLowerCase().replace(/['\u2019.\-]/g,"").replace(/\s+/g," ").trim();
+function foodMatches(it, terms){
+  const hay = searchNorm([it.name, it.brand, it.serving, it.cat].filter(Boolean).join(" "));
+  return terms.every(t=>hay.includes(t));
+}
+
 function browseSource(tab){
   if(tab==="My Foods")   return getMyFoods().map(f=>({...f, kind:"food", verified:true}));
   if(tab==="My Meals")   return getMyMeals().map(m=>({...m, kind:"meal"}));
   if(tab==="My Recipes") return getMyRecipes().map(r=>({...r, kind:"recipe"}));
+  if(tab==="Brands")     return BRAND_FOODS.map(f=>({...f, kind:"food"}));
   if(tab==="Basics")     return BASIC_FOODS.map(f=>({...f, kind:"food"}));
   return foodHistory().map(f=>({...f, kind:"food"}));
 }
@@ -2580,18 +2946,34 @@ function paintBrowse(){
     b.setAttribute("role","tab"); b.setAttribute("aria-selected", String(t===browseTab));
     b.tabIndex = t===browseTab ? 0 : -1;
     b.textContent=t;
-    b.onclick=()=>{ browseTab=t; DB.set("foodTab",t); paintBrowse(); };
+    b.onclick=()=>{ browseTab=t; browseCat=""; DB.set("foodTab",t); paintBrowse(); };
     b.onkeydown=e=>{
       const i=BROWSE_TABS.indexOf(t); let j=null;
       if(e.key==="ArrowRight") j=(i+1)%BROWSE_TABS.length;
       else if(e.key==="ArrowLeft") j=(i-1+BROWSE_TABS.length)%BROWSE_TABS.length;
       else if(e.key==="Home") j=0; else if(e.key==="End") j=BROWSE_TABS.length-1;
       if(j===null) return;
-      e.preventDefault(); browseTab=BROWSE_TABS[j]; DB.set("foodTab",browseTab); paintBrowse();
+      e.preventDefault(); browseTab=BROWSE_TABS[j]; browseCat=""; DB.set("foodTab",browseTab); paintBrowse();
       $("#ft-"+BROWSE_TABS[j].replace(/\s/g,"")).focus();
     };
     tabs.append(b);
   });
+
+  // Brands and Basics are long enough that a flat list is unusable — offer the
+  // chains and food groups as chips, and let a search cut across all of them.
+  const catHost=$("#browse-cats");
+  const cats = browseTab==="Brands" ? BRAND_CATS : browseTab==="Basics" ? BASIC_CATS : null;
+  if(cats && !q){
+    catHost.hidden=false; catHost.innerHTML="";
+    [["","All"]].concat(cats.map(c=>[c,c])).forEach(([id,label])=>{
+      const c=document.createElement("button");
+      c.type="button"; c.className="chip"+(browseCat===id?" on":"");
+      c.setAttribute("aria-pressed", String(browseCat===id));
+      c.textContent=label;
+      c.onclick=()=>{ browseCat = browseCat===id ? "" : id; paintBrowse(); };
+      catHost.append(c);
+    });
+  }else{ catHost.hidden=true; catHost.innerHTML=""; }
 
   const cap=$("#browse-capture"); cap.innerHTML="";
   captureButtons().forEach(([label,ic,fn])=>{
@@ -2603,12 +2985,13 @@ function paintBrowse(){
   // searching. Without one you are browsing the selected tab.
   let items, heading;
   if(q){
-    items=[].concat(...BROWSE_TABS.map(browseSource))
-      .filter(it=>((it.name||"")+" "+(it.brand||"")+" "+(it.serving||"")).toLowerCase().includes(q));
+    const terms=searchNorm(q).split(" ").filter(Boolean);
+    items=[].concat(...BROWSE_TABS.map(browseSource)).filter(it=>foodMatches(it, terms));
     heading=`${items.length} match${items.length===1?"":"es"}`;
   }else{
     items=browseSource(browseTab);
-    heading=browseTab==="History" ? "Recently logged" : browseTab;
+    if(browseCat && (browseTab==="Brands"||browseTab==="Basics")) items=items.filter(i=>i.cat===browseCat);
+    heading = browseTab==="History" ? "Recently logged" : (browseCat||browseTab);
   }
   if(browseSort==="name") items=[...items].sort((a,b)=>(a.name||"").localeCompare(b.name||""));
   $("#browse-listname").textContent=heading;
@@ -2619,7 +3002,10 @@ function paintBrowse(){
   const note=$("#browse-note");
   if(!q && browseTab==="Basics"){
     note.hidden=false;
-    note.textContent="Standard reference values for a plain serving, not a branded database. Check them against your own label — once you log one you can edit the entry, and it becomes yours in History.";
+    note.textContent="Standard reference values for a plain serving. Check them against your own label — once you log one you can edit the entry, and it becomes yours in History.";
+  }else if(!q && browseTab==="Brands"){
+    note.hidden=false;
+    note.textContent="Chain-published figures for the standard item. Chains reformulate, portions vary by store, and anything you customise changes the numbers — check the ones you eat often, and edit the entry after logging if yours differs.";
   }else if(!q && browseTab==="History" && !items.length){
     note.hidden=false;
     note.textContent="Nothing logged yet. Create a food from its label, or start from the Basics tab.";

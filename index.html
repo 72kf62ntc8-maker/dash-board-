@@ -330,6 +330,30 @@
   .meal-head h3,.group-head h3{font-size:15px;font-weight:600;margin:0}
   .group-head.late h3{color:var(--danger)}
 
+  /* ---- Routines ---- */
+  .routine{border:1px solid var(--rim);background:var(--s2);border-radius:var(--radius-sm);
+    padding:16px;margin-bottom:12px}
+  .routine .head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+  .routine h3{font-size:16px;font-weight:600;margin:0}
+  .routine .ex{display:flex;justify-content:space-between;gap:14px;padding:9px 0;
+    border-top:1px solid var(--rim);font-size:14px}
+  .routine .ex .t{color:var(--muted);font:11px ui-monospace,"Courier New",monospace;
+    letter-spacing:1px;white-space:nowrap}
+  .routine .last{display:block;font-size:12.5px;color:var(--faint);margin-top:3px}
+  .routine.done{opacity:.62}
+  .progrow{display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+    padding:14px 0;border-top:1px solid var(--rim)}
+  .progrow:first-child{border-top:0}
+  .progrow .who{flex:1;min-width:170px}
+  .progrow .who strong{font-size:15px;font-weight:600}
+  .progrow .who small{display:block;color:var(--muted);font-size:12.5px;margin-top:3px}
+  .progrow .stat{min-width:96px}
+  .progrow .stat .k{display:block;font:10px ui-monospace,"Courier New",monospace;letter-spacing:1.2px;color:var(--faint)}
+  .progrow .stat .v{display:block;font-size:17px;font-weight:600;margin-top:2px}
+  .progrow .stat .delta{display:block;margin-top:2px}
+  .delta{font-size:12.5px;font-weight:600}
+  .delta.up{color:var(--success)} .delta.down{color:var(--warn)} .delta.flat{color:var(--muted)}
+
   /* ---- Planner / Calendar ---- */
   .due{font:10px ui-monospace,"Courier New",monospace;letter-spacing:1.2px;padding:3px 9px;
     border-radius:99px;border:1px solid var(--rim);color:var(--muted);white-space:nowrap;flex:none}
@@ -1368,6 +1392,14 @@ const PRIO_RANK = {high:0, "":1, undefined:1, low:2};
 /** Open tasks and scheduled events, in the order they actually come at you. */
 function upNext(limit=5){
   const items=[];
+  // Training the program puts on today and tomorrow counts as something due —
+  // it is derived from the week, not a stored event, so it is not editable here.
+  [0,1].forEach(offset=>{
+    const d=new Date(); d.setDate(d.getDate()+offset); const k=todayKey(d);
+    trainingOn(k).filter(t=>!t.done).forEach(t=>items.push({
+      kind:"training", icon:"fitness", title:t.title, date:k, sort:offset, training:true,
+    }));
+  });
   DB.get("tasks",[]).filter(t=>!t.done).forEach(t=>items.push({
     kind:"task", icon:"planner", title:t.title, notes:t.notes,
     date:t.due, sort:dateSort(t.due), prio:t.priority,
@@ -1418,13 +1450,186 @@ function acuteChronic(list, now=Date.now()){
 }
 const hardWithin = (list,days,now=Date.now())=>withinDays(list,days,now).filter(s=>s.intensity==="hard"||s.intensity==="sparring").length;
 
+// ============================================================================
+// ROUTINES AND THE WEEKLY PROGRAM
+//
+// The week used to be slot types — "lift", "mat" — which told you a day was a
+// lift day but not what to lift. A routine is a named session with an exercise
+// list; the program says which routines each weekday holds. The old slot types
+// survive as each routine's `kind`, so the coach and the carb-cycle matcher
+// keep working off the same idea of how hard a day is.
+// ============================================================================
+const ROUTINE_KINDS = [
+  {id:"lift", label:"Lift"},
+  {id:"mat", label:"Mat"},
+  {id:"plyo", label:"Plyo"},
+  {id:"conditioning", label:"Conditioning"},
+];
+const kindLabel = id => ROUTINE_KINDS.find(k=>k.id===id)?.label ?? id;
+
+// A starting library, editable like everything else. Exercises carry target
+// sets and reps so a session has something to beat.
+const DEFAULT_ROUTINES = [
+  {id:"r-push", name:"Push", kind:"lift", exercises:[
+    {name:"Bench Press", sets:4, reps:"6"},
+    {name:"Incline Dumbbell Press", sets:3, reps:"10"},
+    {name:"Overhead Press", sets:3, reps:"8"},
+    {name:"Dips", sets:3, reps:"10"},
+    {name:"Triceps Pushdown", sets:3, reps:"12"},
+  ]},
+  {id:"r-pull", name:"Pull", kind:"lift", exercises:[
+    {name:"Barbell Row", sets:4, reps:"6"},
+    {name:"Pull-ups", sets:3, reps:"8"},
+    {name:"Lat Pulldown", sets:3, reps:"10"},
+    {name:"Face Pull", sets:3, reps:"15"},
+    {name:"Barbell Curl", sets:3, reps:"12"},
+  ]},
+  {id:"r-legs", name:"Legs", kind:"lift", exercises:[
+    {name:"Back Squat", sets:4, reps:"5"},
+    {name:"Romanian Deadlift", sets:3, reps:"8"},
+    {name:"Bulgarian Split Squat", sets:3, reps:"10"},
+    {name:"Leg Curl", sets:3, reps:"12"},
+    {name:"Standing Calf Raise", sets:3, reps:"15"},
+  ]},
+  {id:"r-mat",  name:"Mat work",     kind:"mat", exercises:[]},
+  {id:"r-plyo", name:"Plyometrics",  kind:"plyo", exercises:[
+    {name:"Box Jumps", sets:4, reps:"5"},
+    {name:"Broad Jumps", sets:4, reps:"3"},
+    {name:"Depth Jumps", sets:3, reps:"5"},
+  ]},
+  {id:"r-cond", name:"Conditioning", kind:"conditioning", exercises:[
+    {name:"Sprints", sets:8, reps:"100m"},
+    {name:"Assault Bike Intervals", sets:6, reps:"30s on / 90s off"},
+  ]},
+];
+const getRoutines = ()=>DB.get("routines", null) ?? DEFAULT_ROUTINES;
+const routineById = id => getRoutines().find(r=>r.id===id) || null;
+
+const DEFAULT_PROGRAM = {Mon:["r-push"],Tue:["r-mat"],Wed:["r-pull"],Thu:["r-mat"],Fri:["r-legs"],Sat:["r-mat","r-cond"],Sun:[]};
+const SLOT_ROUTINE = {mat:"r-mat", plyo:"r-plyo", conditioning:"r-cond"};
+
+/**
+ * The week. On first run after routines existed, it is rebuilt from the slot
+ * plan that came before them so a week you already set up is not thrown away —
+ * lift days are dealt Push / Pull / Legs in order, everything else maps to the
+ * routine of the same kind. A rest day is simply a day with nothing on it.
+ */
+function getProgram(){
+  const saved=DB.get("program", null);
+  if(saved) { const out={}; DAY_LABELS.forEach(d=>out[d]=Array.isArray(saved[d])?saved[d]:[]); return out; }
+  const plan=DB.get("plan", null);
+  if(!plan) return {...DEFAULT_PROGRAM};
+  const lifts=["r-push","r-pull","r-legs"]; let li=0; const out={};
+  DAY_LABELS.forEach(d=>{
+    out[d]=(plan[d]||[]).filter(x=>x!=="rest")
+      .map(x=> x==="lift" ? lifts[li++ % lifts.length] : SLOT_ROUTINE[x])
+      .filter(Boolean);
+  });
+  return out;
+}
+function setProgram(prog){ DB.set("program", prog); }
+
+const routinesOnDay = label => (getProgram()[label]||[]).map(routineById).filter(Boolean);
+const plannedToday  = ()=>routinesOnDay(DAY_LABELS[dayIdx(new Date())]);
+
+/** Did a session of this kind actually get logged on that date? */
+function trainedOn(dayKey, kind){
+  if(kind==="lift") return DB.get("lifts",[]).some(w=>todayKey(new Date(w.date))===dayKey);
+  const sessions=DB.get("mma",[]).filter(x=>todayKey(new Date(x.date))===dayKey);
+  if(kind==="plyo") return sessions.some(x=>x.discipline==="plyometrics");
+  if(kind==="conditioning") return sessions.some(x=>x.discipline==="conditioning");
+  return sessions.some(x=>CONTACT.has(x.discipline));
+}
+
+/** What the program puts on a date, shaped like the calendar's own items. */
+function trainingOn(dayKey){
+  if(!isDateKey(dayKey)) return [];
+  const label=DAY_LABELS[dayIdx(new Date(dayKey+"T12:00:00"))];
+  return routinesOnDay(label).map(r=>({
+    kind:"training", id:"tr-"+dayKey+"-"+r.id, title:r.name, routine:r,
+    date:dayKey, done:trainedOn(dayKey, r.kind),
+  }));
+}
+
+// ============================================================================
+// PROGRESSIVE OVERLOAD
+//
+// Beating last time only means something if you can see last time. Every set
+// ever logged for an exercise is pulled back out of the lift log, so the
+// numbers to beat sit next to the box you type the new ones into.
+// ============================================================================
+
+/** Estimated 1RM, Epley. Honest up to about ten reps and drifts optimistic
+ *  above that, so it is called an estimate everywhere it appears. */
+const e1RM = (w,r) => (+w||0) * (1 + (+r||0)/30);
+const setVolume = sets => (sets||[]).reduce((a,x)=>a+(+x.weight||0)*(+x.reps||0),0);
+const bestSet = sets => (sets||[]).reduce((b,x)=>(!b||e1RM(x.weight,x.reps)>e1RM(b.weight,b.reps))?x:b, null);
+const fmtSet = x => x ? `${nfmt(x.weight)}×${x.reps}` : "—";
+const fmtSets = sets => (sets||[]).map(fmtSet).join(", ");
+
+/** Every session that included this exercise, newest first. */
+function exerciseHistory(name){
+  const key=String(name||"").trim().toLowerCase(); if(!key) return [];
+  const out=[];
+  DB.get("lifts",[]).forEach(w=>(w.exercises||[]).forEach(e=>{
+    if(String(e.name||"").trim().toLowerCase()!==key) return;
+    if(!(e.sets||[]).length) return;
+    out.push({date:w.date, sets:e.sets});
+  }));
+  return out.sort((a,b)=>new Date(b.date)-new Date(a.date));
+}
+
+/** Last time, all-time best, and whether the last session moved forward. */
+function exerciseStats(name){
+  const hist=exerciseHistory(name);
+  if(!hist.length) return null;
+  const last=hist[0], prev=hist[1]||null;
+  let pr=null, prDate=null;
+  hist.forEach(h=>{ const b=bestSet(h.sets);
+    if(b && (!pr || e1RM(b.weight,b.reps)>e1RM(pr.weight,pr.reps))) { pr=b; prDate=h.date; } });
+  const lastVol=setVolume(last.sets), prevVol=prev?setVolume(prev.sets):null;
+  return {
+    sessions:hist.length, last, prev,
+    lastBest:bestSet(last.sets), prevBest:prev?bestSet(prev.sets):null,
+    lastVolume:lastVol, prevVolume:prevVol,
+    volumeDelta: prevVol==null ? null : lastVol-prevVol,
+    pr, prDate, heaviest:hist.flatMap(h=>h.sets).reduce((m,x)=>Math.max(m,+x.weight||0),0),
+    series: hist.slice().reverse().map(h=>{ const b=bestSet(h.sets);
+      return {date:h.date, e1rm:b?e1RM(b.weight,b.reps):0, volume:setVolume(h.sets)}; }),
+  };
+}
+
+/**
+ * Double progression, named so you know which rule is being applied: hit every
+ * target rep at a weight and it is time to add weight; fall short and repeat
+ * the weight chasing the reps. Only offered when there is a target to judge
+ * against and a session to judge.
+ */
+function overloadHint(exercise, stats){
+  if(!stats) return "First time logging this — whatever you do becomes the number to beat.";
+  const target=parseInt(exercise?.reps,10);
+  const sets=stats.last.sets;
+  if(!isFinite(target) || !sets.length) return `Last time: ${fmtSets(sets)}. Beat it.`;
+  const allHit=sets.every(x=>(+x.reps||0)>=target) && sets.length>=(+exercise.sets||sets.length);
+  return allHit
+    ? `Last time you hit every rep (${fmtSets(sets)}) — add weight.`
+    : `Last time: ${fmtSets(sets)}. Repeat the weight and chase ${target} reps.`;
+}
+
+/** Exercises you have actually logged, most recently trained first. */
+function trackedExercises(){
+  const seen=new Map();
+  DB.get("lifts",[]).forEach(w=>(w.exercises||[]).forEach(e=>{
+    const n=String(e.name||"").trim(); if(!n || !(e.sets||[]).length) return;
+    const k=n.toLowerCase();
+    if(!seen.has(k)) seen.set(k, n);
+  }));
+  return [...seen.values()];
+}
+
 // ---- Weekly plan ----
 const DAY_LABELS = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
-const SLOTS = [{id:"lift",label:"Lift"},{id:"mat",label:"Mat"},{id:"plyo",label:"Plyo"},{id:"conditioning",label:"Conditioning"},{id:"rest",label:"Rest"}];
-const slotLabel = id=>SLOTS.find(s=>s.id===id)?.label.toLowerCase() ?? id;
-const DEFAULT_PLAN = {Mon:["lift"],Tue:["mat"],Wed:["lift"],Thu:["mat"],Fri:["lift"],Sat:["mat","conditioning"],Sun:["rest"]};
 const dayIdx = d=>(d.getDay()+6)%7;
-const plannedToday = plan=>plan[DAY_LABELS[dayIdx(new Date())]] ?? [];
 function consecutiveTrainingDays(dateSet, today){
   let n=0; const c=new Date(today+"T00:00:00");
   for(let i=0;i<30;i++){ if(!dateSet.has(todayKey(c))) break; n++; c.setDate(c.getDate()-1); }
@@ -1503,7 +1708,7 @@ function runCoach(){
   const out=[];
   const day=todayKey();
   const foodLog=DB.get("foodLog",{}); const totals=foodTotals(foodLog[day]); const t=getTargets();
-  const mma=DB.get("mma",[]); const lifts=DB.get("lifts",[]); const plan=DB.get("plan",DEFAULT_PLAN);
+  const mma=DB.get("mma",[]); const lifts=DB.get("lifts",[]);
   const weigh=DB.get("weighins",{});
   const trendSeries=computeTrend(weightSeries(weigh));
   const trendWeight=trendSeries.length?trendSeries[trendSeries.length-1].trend:null;
@@ -1529,11 +1734,11 @@ function runCoach(){
     `${evToday.length} thing${evToday.length===1?"":"s"} on the calendar today${evToday[0].time?` — ${esc(evToday[0].title)} at ${evToday[0].time}`:""}.`,"info"]);
 
   // Plan for today
-  const pt=plannedToday(plan);
+  const pt=plannedToday();
   const trainedToday = mma.some(s=>todayKey(new Date(s.date))===day) || lifts.some(w=>todayKey(new Date(w.date))===day);
-  if(pt.length && !trainedToday){
-    if(pt.length===1&&pt[0]==="rest") out.push(["Today is a rest day on your plan — take it.","info"]);
-    else out.push([`Plan says ${pt.map(p=>p==="mat"?"mat work":slotLabel(p)).join(" and ")} today.`,"info"]);
+  if(!trainedToday){
+    if(!pt.length) out.push(["Rest day on your program — take it.","info"]);
+    else out.push([`On the program today: ${pt.map(r=>r.name).join(" + ")}.`,"info"]);
   }
   // Mat volume spike
   const acwr=acuteChronic(mma);
@@ -1734,7 +1939,7 @@ function show(name){
   // Landing on a section always starts at today; the day strip travels from
   // there. Without this you could leave Food on last Tuesday and come back to
   // what looks like a day where you ate nothing.
-  if(name!==current){ viewDay=todayKey(); foodTab="today"; }
+  if(name!==current){ viewDay=todayKey(); foodTab="today"; fitTab="today"; }
   current = name;
   document.querySelectorAll("nav button").forEach(b=>{ const on=b.dataset.module===name; b.classList.toggle("active",on); if(on) b.setAttribute("aria-current","page"); else b.removeAttribute("aria-current"); });
   $("#crumb").textContent = name.toUpperCase();
@@ -1942,25 +2147,126 @@ function runAction(a){
 }
 
 // ---- FITNESS ----
-function renderFitness(){
-  const mma=DB.get("mma",[]); const lifts=DB.get("lifts",[]); const plan=DB.get("plan",DEFAULT_PLAN);
-  const week=withinDays(mma,7); const weekMin=week.reduce((a,s)=>a+(+s.minutes||0),0);
-  const weigh=DB.get("weighins",{}); const wCount=Object.keys(weigh).length;
-  const trendSeries=computeTrend(weightSeries(weigh));
-  const trendWeight=trendSeries.length?trendSeries[trendSeries.length-1].trend:null;
-  const rate=weeklyRate(trendSeries);
-  const spark=sparkline(trendSeries);
+// ============================================================================
+// FITNESS
+//
+// Four screens behind one bar. It used to be a single scroll where the weekly
+// plan sat between the weight panel and the session list, and the plan itself
+// only said "lift" — never what to lift.
+// ============================================================================
+const FIT_TABS = [["today","Today"],["program","Program"],["progress","Progress"],["history","History"]];
+let fitTab = "today";
 
-  $("#view-fitness").innerHTML = `
+function renderFitness(){
+  const mma=DB.get("mma",[]); const lifts=DB.get("lifts",[]);
+  const today=plannedToday();
+
+  const bar=`
+    <div class="panel foodbar">
+      <div class="foodbar-top">
+        <div>
+          <p class="eyebrow" style="margin:0">${esc(new Date().toLocaleDateString(undefined,{weekday:"long"}).toUpperCase())}</p>
+          <p style="margin:4px 0 0;font-size:15px">${today.length
+            ? esc(today.map(r=>r.name).join(" + "))
+            : `<span class="muted">Rest day</span>`}</p>
+        </div>
+        <div class="row" style="gap:10px;flex-wrap:wrap">
+          <button class="btn" id="f-lift">Log a lift</button>
+          <button class="primary" id="f-mat">Log session</button>
+        </div>
+      </div>
+      <div class="tabs" id="fit-tabs" role="tablist" aria-label="Fitness screens"></div>
+    </div>`;
+
+  let body="";
+  if(fitTab==="today")        body=fitToday(today, mma);
+  else if(fitTab==="program") body=fitProgram();
+  else if(fitTab==="progress")body=fitProgress();
+  else                        body=fitHistory(mma, lifts);
+
+  $("#view-fitness").innerHTML = bar + `<div id="fit-panel" role="tabpanel" aria-labelledby="fit-${fitTab}">${body}</div>`;
+
+  const tabs=$("#fit-tabs");
+  FIT_TABS.forEach(([id,label],i)=>{
+    const b=document.createElement("button"); b.type="button"; b.id="fit-"+id;
+    b.setAttribute("role","tab"); b.setAttribute("aria-controls","fit-panel");
+    b.setAttribute("aria-selected", String(id===fitTab));
+    b.tabIndex = id===fitTab ? 0 : -1;
+    b.textContent=label;
+    b.onclick=()=>{ fitTab=id; renderFitness(); };
+    b.onkeydown=e=>{
+      let j=null;
+      if(e.key==="ArrowRight") j=(i+1)%FIT_TABS.length;
+      else if(e.key==="ArrowLeft") j=(i-1+FIT_TABS.length)%FIT_TABS.length;
+      else if(e.key==="Home") j=0; else if(e.key==="End") j=FIT_TABS.length-1;
+      if(j===null) return;
+      e.preventDefault(); fitTab=FIT_TABS[j][0]; renderFitness(); $("#fit-"+fitTab).focus();
+    };
+    tabs.append(b);
+  });
+
+  $("#f-mat").onclick=()=>openMat();
+  $("#f-lift").onclick=()=>openLift();
+  const host=$("#view-fitness");
+  host.querySelectorAll("[data-log-routine]").forEach(b=>b.onclick=()=>{
+    const r=routineById(b.dataset.logRoutine); if(!r) return;
+    r.kind==="lift" ? openLift(r) : openMat(r);
+  });
+  if(fitTab==="program"){
+    host.querySelectorAll("[data-day-add]").forEach(b=>b.onclick=()=>openAssignDay(b.dataset.dayAdd));
+    host.querySelectorAll("[data-day-drop]").forEach(b=>b.onclick=()=>{
+      const [d,id]=b.dataset.dayDrop.split("|");
+      const prog=getProgram(); prog[d]=(prog[d]||[]).filter(x=>x!==id);
+      setProgram(prog); renderFitness();
+    });
+    host.querySelectorAll("[data-routine-edit]").forEach(b=>b.onclick=()=>openRoutine(routineById(b.dataset.routineEdit)));
+    host.querySelectorAll("[data-routine-del]").forEach(b=>b.onclick=()=>{
+      const id=b.dataset.routineDel;
+      DB.set("routines", getRoutines().filter(r=>r.id!==id));
+      const prog=getProgram(); DAY_LABELS.forEach(d=>prog[d]=(prog[d]||[]).filter(x=>x!==id));
+      setProgram(prog); renderFitness(); toast("Routine deleted");
+    });
+    $("#f-new-routine").onclick=()=>openRoutine();
+  }
+  if(fitTab==="history"){
+    $("#f-weight").onclick=openWeight;
+    $("#f-obsidian").onclick=openObsidian;
+  }
+}
+
+/** What is on today, with the numbers to beat sitting next to each exercise. */
+function fitToday(today, mma){
+  const week=withinDays(mma,7);
+  const weekMin=week.reduce((a,s)=>a+(+s.minutes||0),0);
+  const dayKey=todayKey();
+  return `
+    <div class="panel">
+      <div class="section-title"><h2>On the program today</h2>
+        <button class="ghost" onclick="fitTab='program';renderFitness()">Edit the week →</button></div>
+      ${today.length ? today.map(r=>{
+        const done=trainedOn(dayKey, r.kind);
+        return `<div class="routine${done?" done":""}">
+          <div class="head">
+            <h3>${esc(r.name)}${done?` <span class="tag">DONE</span>`:""}</h3>
+            <span class="row" style="gap:12px">
+              <span class="tag">${esc(kindLabel(r.kind).toUpperCase())}</span>
+              <button class="btn" data-log-routine="${esc(r.id)}">${done?"Log again":"Log it"}</button>
+            </span>
+          </div>
+          ${(r.exercises||[]).length ? r.exercises.map(ex=>{
+            const st=exerciseStats(ex.name);
+            return `<div class="ex">
+              <span>${esc(ex.name)}${st?`<span class="last">Last: ${esc(fmtSets(st.last.sets))}</span>`:`<span class="last">Not logged yet</span>`}</span>
+              <span class="t">${esc(String(ex.sets))}×${esc(String(ex.reps))}</span>
+            </div>`; }).join("")
+          : `<p class="muted" style="font-size:13.5px;margin:10px 0 0">No exercise list — log it as a session with minutes and intensity.</p>`}
+        </div>`; }).join("")
+      : `<p class="empty">Nothing on the program today. Rest is part of it — or log something anyway and it counts as extra.</p>`}
+    </div>
+
     <div class="grid cols-2">
       <div class="panel">
-        <div class="section-title"><h2>Log training</h2><span class="tag">~3 TAPS</span></div>
-        <div class="row" style="gap:10px;flex-wrap:wrap">
-          <button class="primary" id="f-mat">Log session</button>
-          <button class="btn" id="f-lift">Log a lift</button>
-          <button class="btn" id="f-obsidian">Import Obsidian</button>
-        </div>
-        <div class="section-title" style="margin-top:22px"><h2>This week</h2></div>
+        <div class="section-title"><h2>This week</h2></div>
         <p class="big">${weekMin} min <span class="muted" style="font-size:15px">· ${week.length} session${week.length===1?"":"s"}</span></p>
         <p class="muted" style="margin:2px 0 0">${hardWithin(mma,7)} hard · training load ${totalLoad(week)}</p>
       </div>
@@ -1968,56 +2274,187 @@ function renderFitness(){
         <div class="section-title"><h2>Coach</h2><span class="tag">SIGNALS</span></div>
         ${runCoach().map(c=>`<p class="coach-line coach-${c[1]}">${esc(c[0])}</p>`).join("")}
       </div>
+    </div>`;
+}
+
+/** The week, and the routines it draws from. */
+function fitProgram(){
+  const prog=getProgram(), routines=getRoutines();
+  const todayLabel=DAY_LABELS[dayIdx(new Date())];
+  return `
+    <div class="panel">
+      <div class="section-title"><h2>Your week</h2><span class="tag">REPEATS</span></div>
+      ${DAY_LABELS.map(d=>{
+        const ids=prog[d]||[];
+        return `<div class="typerow${d===todayLabel?" today":""}">
+          <span class="lab">${esc(d)}${d===todayLabel?" •":""}</span>
+          <span class="chip-row">
+            ${ids.map(id=>{ const r=routineById(id); if(!r) return "";
+              return `<button type="button" class="chip on" data-day-drop="${esc(d)}|${esc(id)}"
+                title="Remove ${esc(r.name)} from ${esc(d)}">${esc(r.name)} ×</button>`; }).join("")}
+            <button type="button" class="chip" data-day-add="${esc(d)}">+ Add</button>
+          </span>
+          <span class="macros">${ids.length?`${ids.length} SESSION${ids.length===1?"":"S"}`:"REST"}</span>
+        </div>`;
+      }).join("")}
     </div>
 
     <div class="panel">
-      <div class="section-title"><h2>Weekly plan</h2><span class="tag">TAP TO SET · REPEATS</span></div>
-      <div id="plangrid"></div>
-    </div>
+      <div class="section-title"><h2>Routines</h2><button class="primary" id="f-new-routine">Create routine</button></div>
+      ${routines.length ? routines.map(r=>`
+        <div class="routine">
+          <div class="head">
+            <h3>${esc(r.name)}</h3>
+            <span class="row" style="gap:10px">
+              <span class="tag">${esc(kindLabel(r.kind).toUpperCase())}</span>
+              <button type="button" class="del" data-routine-edit="${esc(r.id)}" aria-label="Edit ${esc(r.name)}">${icon("edit")}</button>
+              <button type="button" class="del" data-routine-del="${esc(r.id)}" aria-label="Delete ${esc(r.name)}">${icon("x")}</button>
+            </span>
+          </div>
+          ${(r.exercises||[]).length ? r.exercises.map(ex=>`<div class="ex">
+              <span>${esc(ex.name)}</span><span class="t">${esc(String(ex.sets))}×${esc(String(ex.reps))}</span>
+            </div>`).join("")
+          : `<p class="muted" style="font-size:13.5px;margin:10px 0 0">No exercise list — logged as minutes and intensity.</p>`}
+        </div>`).join("")
+      : `<p class="empty">No routines yet.</p>`}
+    </div>`;
+}
 
+/** Progressive overload: last time, all-time best, and the direction. */
+function fitProgress(){
+  const names=trackedExercises();
+  if(!names.length) return `<div class="panel">
+    <div class="section-title"><h2>Progressive overload</h2></div>
+    <p class="empty">Log a lift and this starts tracking it — last session, best set, and whether you moved forward.</p></div>`;
+  const rows=names.map(n=>({name:n, st:exerciseStats(n)})).filter(x=>x.st);
+  return `
+    <div class="panel">
+      <div class="section-title"><h2>Progressive overload</h2><span class="tag">${rows.length} EXERCISE${rows.length===1?"":"S"}</span></div>
+      <p class="muted" style="font-size:13.5px;margin:0 0 6px">
+        Best set is the heaviest by estimated 1RM (Epley), which is an estimate and drifts optimistic past about ten reps.
+        Volume is weight × reps across the session.
+      </p>
+      ${rows.map(({name,st})=>{
+        const d=st.volumeDelta;
+        const dir = d==null ? "flat" : d>0 ? "up" : d<0 ? "down" : "flat";
+        const dtxt = d==null ? "First session" : d===0 ? "Same volume" : `${d>0?"+":"−"}${nfmt(Math.abs(d))} lb volume`;
+        return `<div class="progrow">
+          <span class="who">
+            <strong>${esc(name)}</strong>
+            <small>Last ${esc(new Date(st.last.date).toLocaleDateString(undefined,{month:"short",day:"numeric"}))} · ${esc(fmtSets(st.last.sets))}</small>
+          </span>
+          <span class="stat"><span class="k">BEST SET</span><span class="v">${esc(fmtSet(st.pr))}</span></span>
+          <span class="stat"><span class="k">EST 1RM</span><span class="v">${st.pr?nfmt(e1RM(st.pr.weight,st.pr.reps)):"—"}</span></span>
+          <span class="stat"><span class="k">VOLUME</span><span class="v">${nfmt(st.lastVolume)}</span>
+            <span class="delta ${dir}">${esc(dtxt)}</span></span>
+          ${st.series.length>2?sparkline(st.series.map(x=>({date:x.date, trend:x.e1rm}))):""}
+        </div>`;
+      }).join("")}
+    </div>`;
+}
+
+/** Weight, sessions and lifts — the record rather than the plan. */
+function fitHistory(mma, lifts){
+  const weigh=DB.get("weighins",{}); const wCount=Object.keys(weigh).length;
+  const trendSeries=computeTrend(weightSeries(weigh));
+  const trendWeight=trendSeries.length?trendSeries[trendSeries.length-1].trend:null;
+  const rate=weeklyRate(trendSeries);
+  return `
     <div class="panel">
       <div class="section-title"><h2>Weight</h2><button class="btn" id="f-weight">Log weight</button></div>
       ${trendWeight!=null ? `
         <p class="big">${trendWeight.toFixed(1)} <span class="muted" style="font-size:15px">lbs trend</span></p>
-        ${rate!=null ? `<p class="muted" style="margin:2px 0 0">${Math.abs(rate).toFixed(1)} lbs/week ${rate<0?"loss":"gain"} · ${wCount} weigh-in${wCount===1?"":"s"} logged</p>` : `<p class="muted" style="margin:2px 0 0">${wCount} weigh-in${wCount===1?"":"s"} — a few more days and a trend appears.</p>`}
-        ${spark}
+        ${rate!=null ? `<p class="muted" style="margin:2px 0 0">${Math.abs(rate).toFixed(1)} lbs/week ${rate<0?"loss":"gain"} · ${wCount} weigh-in${wCount===1?"":"s"} logged</p>`
+                     : `<p class="muted" style="margin:2px 0 0">${wCount} weigh-in${wCount===1?"":"s"} — a few more days and a trend appears.</p>`}
+        ${sparkline(trendSeries)}
       ` : `<p class="empty">No weigh-ins yet. Log one, or import from Obsidian.</p>`}
     </div>
 
     <div class="panel">
       <div class="section-title"><h2>Recent sessions</h2></div>
-      <div id="mat-list">${mma.length ? mma.slice(0,8).map(s=>`
+      <div id="mat-list">${mma.length ? mma.slice(0,10).map(s=>`
         <div class="entry"><div class="body"><strong>${esc(discLabel(s.discipline))} · ${s.minutes} min · ${esc(inten(s.intensity)?.label||s.intensity)}</strong>
         <small>${esc(new Date(s.date).toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"}))}</small>
-        ${s.notes?`<p>${esc(s.notes)}</p>`:""}</div><span class="accent" style="font-weight:600">${sessionLoad(s)}</span></div>`).join("") : `<p class="empty">No sessions yet.</p>`}</div>
+        ${s.notes?`<p>${esc(s.notes)}</p>`:""}</div><span class="accent" style="font-weight:600">${sessionLoad(s)}</span></div>`).join("")
+        : `<p class="empty">No sessions yet.</p>`}</div>
     </div>
 
     <div class="panel">
       <div class="section-title"><h2>Recent lifts</h2></div>
-      <div>${lifts.length ? lifts.slice(0,8).map(w=>`
-        <div class="entry"><div class="body"><strong>${esc((w.exercises||[]).map(e=>e.name).join(", ")||"Workout")}</strong>
-        <small>${esc(new Date(w.date).toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"}))}</small></div></div>`).join("") : `<p class="empty">No lifts yet.</p>`}</div>
+      <div>${lifts.length ? lifts.slice(0,10).map(w=>`
+        <div class="entry"><div class="body">
+          <strong>${esc((w.exercises||[]).map(e=>e.name).join(", ")||"Workout")}</strong>
+          <small>${esc(new Date(w.date).toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"}))}</small>
+          ${(w.exercises||[]).some(e=>(e.sets||[]).length)?`<p>${esc((w.exercises||[]).filter(e=>(e.sets||[]).length).map(e=>`${e.name} ${fmtSets(e.sets)}`).join(" · "))}</p>`:""}
+        </div></div>`).join("") : `<p class="empty">No lifts yet.</p>`}</div>
+      <div class="row" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--rim)">
+        <button class="btn" id="f-obsidian">Import Obsidian</button>
+      </div>
     </div>`;
+}
 
-  // Plan grid
-  const pg=$("#plangrid");
-  DAY_LABELS.forEach(dl=>{
-    const row=document.createElement("div"); row.style.cssText="padding:10px 0;border-top:1px solid var(--line)";
-    const trained = (dl===DAY_LABELS[dayIdx(new Date())]);
-    row.innerHTML=`<div class="row" style="justify-content:space-between"><strong>${dl}${trained?' <span class="tag">TODAY</span>':""}</strong></div><div class="chip-row" style="margin-top:6px"></div>`;
-    const cr=row.querySelector(".chip-row");
-    SLOTS.forEach(sl=>{ const on=(plan[dl]||[]).includes(sl.id); const c=document.createElement("button");
-      c.className="chip"+(on?" on":""); c.textContent=sl.label;
-      c.onclick=()=>{ const p=DB.get("plan",DEFAULT_PLAN); let cur=p[dl]||[];
-        if(cur.includes(sl.id)) cur=cur.filter(x=>x!==sl.id);
-        else if(sl.id==="rest") cur=["rest"]; else cur=[...cur.filter(x=>x!=="rest"),sl.id];
-        p[dl]=cur; DB.set("plan",p); renderFitness(); };
-      cr.append(c); });
-    pg.append(row);
+// ---- Assigning routines to a day ----
+function openAssignDay(dayLabel){
+  const prog=getProgram(); const on=new Set(prog[dayLabel]||[]);
+  const routines=getRoutines();
+  $("#entry-title").textContent=`${dayLabel} — what's on`;
+  $("#entry-fields").innerHTML = routines.length ? `
+    <p class="note" style="margin-top:12px">Pick everything this day holds. A day with nothing on it is a rest day.</p>
+    <div style="margin-top:14px">${routines.map(r=>`
+      <label class="row" style="gap:10px;margin:0;padding:10px 0;border-top:1px solid var(--rim);font-size:14px;color:var(--text)">
+        <input type="checkbox" data-pick="${esc(r.id)}" ${on.has(r.id)?"checked":""} style="width:auto;flex:none"/>
+        <span>${esc(r.name)} <span class="muted">· ${esc(kindLabel(r.kind))}${(r.exercises||[]).length?` · ${r.exercises.length} exercises`:""}</span></span>
+      </label>`).join("")}</div>`
+    : `<p class="note" style="margin-top:14px">No routines yet — create one first.</p>`;
+  $("#entry-form").onsubmit=e=>{
+    e.preventDefault();
+    const picked=[...$("#entry-fields").querySelectorAll("[data-pick]")].filter(c=>c.checked).map(c=>c.dataset.pick);
+    const p=getProgram(); p[dayLabel]=picked; setProgram(p);
+    $("#entry-dialog").close(); toast(picked.length?`${dayLabel} set`:`${dayLabel} is a rest day`); renderFitness();
+  };
+  openDialog($("#entry-dialog"));
+}
+
+// ---- Creating and editing a routine ----
+function openRoutine(existing){
+  const r=existing||{};
+  $("#entry-title").textContent = existing ? "Edit routine" : "Create routine";
+  $("#entry-fields").innerHTML=`
+    <label for="ro-name">Name</label><input id="ro-name" value="${esc(r.name||"")}" placeholder="Push"/>
+    <label>Kind</label><div class="chip-row" id="ro-kind"></div>
+    <label for="ro-ex">Exercises — one per line, <span class="faint">Name SETSxREPS</span></label>
+    <textarea id="ro-ex" style="min-height:150px" placeholder="Bench Press 4x6
+Incline Dumbbell Press 3x10
+Sprints 8x100m">${esc((r.exercises||[]).map(e=>`${e.name} ${e.sets}x${e.reps}`).join("\n"))}</textarea>
+    <p class="note">Reps can be anything you actually do — <code>6</code>, <code>8-10</code>, <code>100m</code>, <code>30s</code>. Leave it empty for a session you time rather than count.</p>`;
+  let kind = ROUTINE_KINDS.some(k=>k.id===r.kind) ? r.kind : "lift";
+  const chips=$("#ro-kind");
+  ROUTINE_KINDS.forEach(k=>{
+    const c=document.createElement("button");
+    c.type="button"; c.className="chip"+(kind===k.id?" on":"");
+    c.setAttribute("aria-pressed", String(kind===k.id));
+    c.textContent=k.label;
+    c.onclick=()=>{ kind=k.id;
+      [...chips.children].forEach(x=>{x.classList.remove("on");x.setAttribute("aria-pressed","false");});
+      c.classList.add("on"); c.setAttribute("aria-pressed","true"); };
+    chips.append(c);
   });
-
-  $("#f-mat").onclick=openMat; $("#f-lift").onclick=openLift; $("#f-obsidian").onclick=openObsidian;
-  $("#f-weight").onclick=openWeight;
+  $("#entry-form").onsubmit=e=>{
+    e.preventDefault();
+    const name=$("#ro-name").value.trim(); if(!name){ $("#ro-name").focus(); return; }
+    const exercises=$("#ro-ex").value.split(/\r?\n/).map(line=>{
+      const t=line.trim(); if(!t) return null;
+      const m=t.match(/^(.*?)\s+(\d+)\s*[x×]\s*(\S+)$/i);
+      if(m) return {name:m[1].trim(), sets:+m[2], reps:m[3]};
+      return {name:t, sets:3, reps:"10"};   // a bare name still becomes an exercise
+    }).filter(Boolean);
+    const rec={id:r.id||uid(), name, kind, exercises};
+    const l=getRoutines(); const i=l.findIndex(x=>x.id===rec.id);
+    if(i>=0) l[i]=rec; else l.push(rec);
+    DB.set("routines", l);
+    $("#entry-dialog").close(); toast(existing?"Routine updated":"Routine created"); renderFitness();
+  };
+  openDialog($("#entry-dialog")); setTimeout(()=>$("#ro-name").focus(),40);
 }
 
 // ============================================================================
@@ -2284,10 +2721,10 @@ function renderCarbWeek(){
  * a mid day, a rest day (or an empty one) is low.
  */
 function matchTrainingPlan(){
-  const plan=DB.get("plan", DEFAULT_PLAN); const w={};
+  const prog=getProgram(); const w={};
   DAY_LABELS.forEach(d=>{
-    const slots=(plan[d]||[]).filter(x=>x!=="rest");
-    w[d] = slots.length>=2 ? "high" : slots.length===1 ? "mid" : "low";
+    const n=(prog[d]||[]).length;
+    w[d] = n>=2 ? "high" : n===1 ? "mid" : "low";
   });
   DB.set("carbWeek", w); renderFood();
   toast("Rotation matched to your training week");
@@ -2619,12 +3056,27 @@ function renderCalendar(){
     || (a.time||"99:99").localeCompare(b.time||"99:99")
     || String(a.title).localeCompare(String(b.title));
 
+  // The program is part of what is coming up, so the week ahead of training
+  // shows alongside the events. It stops at seven days on purpose: the program
+  // repeats, and projecting it further would bury real events under it. These
+  // are derived from the week rather than stored, so they carry no edit or delete.
+  const training=[];
+  if(eventFilter!=="past"){
+    for(let i=0;i<7;i++){
+      const d=new Date(); d.setDate(d.getDate()+i);
+      trainingOn(todayKey(d)).forEach(t=>training.push(t));
+    }
+  }
+
   let groups=[];
   if(eventFilter==="past"){
     groups=[{label:"Earlier", items:[...past].sort((a,b)=>byTime(b,a))}];
   }else{
     groups=BUCKETS.filter(b=>b.id!=="past"&&b.id!=="none")
-      .map(b=>({label:b.label, items:upcoming.filter(e=>bucketOf(e.date)===b.id).sort(byTime)}));
+      .map(b=>({label:b.label, items:[
+        ...upcoming.filter(e=>bucketOf(e.date)===b.id),
+        ...training.filter(t=>bucketOf(t.date)===b.id),
+      ].sort(byTime)}));
     if(eventFilter==="all") groups.push({label:"Earlier", items:[...past].sort((a,b)=>byTime(b,a))});
     // Events carried over from before there was a date field keep their
     // free-text "when" and sit in their own group rather than being guessed at.
@@ -2657,7 +3109,7 @@ function renderCalendar(){
     </div>`;
 
   const tabs=$("#cal-tabs");
-  [["upcoming","Upcoming",upcoming.length+unscheduled.length],["past","Past",past.length],["all","All",all.length]]
+  [["upcoming","Upcoming",upcoming.length+unscheduled.length+training.length],["past","Past",past.length],["all","All",all.length+training.length]]
     .forEach(([id,label,n],i,arr)=>{
       const b=document.createElement("button"); b.type="button"; b.id="cal-tab-"+id;
       b.setAttribute("role","tab"); b.setAttribute("aria-controls","view-generic");
@@ -2681,6 +3133,7 @@ function renderCalendar(){
 }
 
 function eventRow(e){
+  if(e.kind==="training") return trainingRow(e);
   const label=dateLabel(e.date);
   const now=e.date===todayKey();
   const when = label ? label + (e.time?` · ${e.time}`:"") : (e.when || "");
@@ -2692,6 +3145,21 @@ function eventRow(e){
     ${when?`<span class="due${now?" now":""}">${esc(when.toUpperCase())}</span>`:""}
     <button type="button" class="del" data-edit-id="${esc(e.id)}" aria-label="Edit ${esc(e.title)}">${icon("edit")}</button>
     <button type="button" class="del" data-del="${esc(e.id)}" aria-label="Delete ${esc(e.title)}">${icon("x")}</button>
+  </div>`;
+}
+
+/** Training from the weekly program: shown, not editable, and ticked off when
+ *  a matching session has actually been logged that day. */
+function trainingRow(t){
+  const label=dateLabel(t.date);
+  const now=t.date===todayKey();
+  return `<div class="entry"${t.done?' style="opacity:.6"':""}>
+    <span class="upnext-ic" title="Training">${icon("fitness")}</span>
+    <div class="body">
+      <strong style="${t.done?'text-decoration:line-through;color:var(--muted)':''}">${esc(t.title)}</strong>
+      <small>${esc(kindLabel(t.routine.kind))} · from your program${t.done?" · done":""}</small>
+    </div>
+    ${label?`<span class="due${now?" now":""}">${esc(label.toUpperCase())}</span>`:""}
   </div>`;
 }
 
@@ -3410,33 +3878,86 @@ function openWaterSettings(){
 }
 
 // Mat work capture
-function openMat(){
-  let d0=DISCIPLINES[0].id, i0="hard", min=60;
-  $("#entry-title").textContent="Log session";
+function openMat(routine){
+  // A routine tells us which discipline this is, so the day's conditioning
+  // does not get logged as sparring by default.
+  const preset = routine && {plyo:"plyometrics", conditioning:"conditioning"}[routine.kind];
+  let d0=preset || DISCIPLINES[0].id, i0="hard", min=60;
+  $("#entry-title").textContent = routine ? `Log ${routine.name}` : "Log session";
   $("#entry-fields").innerHTML=`
     <label>Discipline</label><div class="chip-row" id="mm-disc"></div>
     <label>Intensity</label><div class="chip-row" id="mm-int"></div>
     <label>Minutes</label><div class="chip-row" id="mm-min"></div>
-    <label>Notes <span class="faint">(optional)</span></label><textarea id="mm-notes"></textarea>`;
+    <label>Notes <span class="faint">(optional)</span></label><textarea id="mm-notes">${routine?esc(routine.name):""}</textarea>`;
   const chips=(host,items,sel,onPick)=>{ const h=$(host); h.innerHTML=""; items.forEach(it=>{ const c=document.createElement("button"); c.type="button"; c.className="chip"+(it.id===sel()?" on":""); c.textContent=it.label;
     c.onclick=()=>{ onPick(it.id); [...h.children].forEach(x=>x.classList.remove("on")); c.classList.add("on"); }; h.append(c); }); };
   chips("#mm-disc",DISCIPLINES,()=>d0,v=>d0=v);
   chips("#mm-int",INTENSITIES,()=>i0,v=>i0=v);
   chips("#mm-min",[30,45,60,90,120].map(m=>({id:m,label:m+" min"})),()=>min,v=>min=v);
-  $("#entry-form").onsubmit=e=>{ e.preventDefault(); const l=DB.get("mma",[]); l.unshift({id:uid(),date:new Date().toISOString(),discipline:d0,intensity:i0,minutes:min,notes:$("#mm-notes").value.trim()}); DB.set("mma",l); $("#entry-dialog").close(); toast("Mat session logged"); renderFitness(); };
+  $("#entry-form").onsubmit=e=>{ e.preventDefault(); const l=DB.get("mma",[]); l.unshift({id:uid(),date:new Date().toISOString(),discipline:d0,intensity:i0,minutes:min,notes:$("#mm-notes").value.trim()}); DB.set("mma",l); $("#entry-dialog").close(); toast("Session logged");
+    if(current==="Fitness") renderFitness(); else if(current==="Command") renderCommand(); };
   openDialog($("#entry-dialog"));
 }
 
-// Lift capture (lightweight: name + sets as text)
-function openLift(){
-  $("#entry-title").textContent="Log a lift";
-  $("#entry-fields").innerHTML=`<label>Exercise</label><input id="lf-name" placeholder="Bench Press"/>
-    <label>Sets <span class="faint">(e.g. 185x8, 185x8, 180x7)</span></label><input id="lf-sets" placeholder="185x8, 185x8"/>`;
-  $("#entry-form").onsubmit=e=>{ e.preventDefault(); const name=$("#lf-name").value.trim(); if(!name)return;
-    const sets=[...$("#lf-sets").value.matchAll(/(\d+(?:\.\d+)?)\s*[x×]\s*(\d+)/gi)].map(m=>({weight:+m[1],reps:+m[2]}));
-    const l=DB.get("lifts",[]); l.unshift({id:uid(),date:new Date().toISOString(),exercises:[{name,sets}]}); DB.set("lifts",l);
-    $("#entry-dialog").close(); toast("Lift logged"); renderFitness(); };
-  openDialog($("#entry-dialog")); setTimeout(()=>$("#lf-name").focus(),40);
+// Lift capture. Given a routine it logs the whole session at once, with last
+// time's sets printed under each box — progressive overload only works if the
+// number to beat is in front of you while you type the new one.
+function openLift(routine){
+  const list = routine && (routine.exercises||[]).length ? routine.exercises : null;
+  $("#entry-title").textContent = list ? `Log ${routine.name}` : "Log a lift";
+  if(list){
+    $("#entry-fields").innerHTML = `
+      <p class="note" style="margin-top:12px">Fill in what you actually did. Anything left blank is skipped.</p>
+      ${list.map((ex,i)=>{
+        const st=exerciseStats(ex.name);
+        return `<label for="lf-${i}">${esc(ex.name)}
+            <span class="faint">target ${esc(String(ex.sets))}×${esc(String(ex.reps))}</span></label>
+          <input id="lf-${i}" data-ex="${esc(ex.name)}" placeholder="185x8, 185x8, 180x7"/>
+          <p class="note" style="margin:6px 0 0">${esc(overloadHint(ex, st))}</p>`;
+      }).join("")}`;
+  }else{
+    const tracked=trackedExercises();
+    $("#entry-fields").innerHTML=`
+      <label for="lf-name">Exercise</label>
+      <input id="lf-name" list="lf-known" placeholder="Bench Press" autocomplete="off"/>
+      <datalist id="lf-known">${tracked.map(n=>`<option value="${esc(n)}"></option>`).join("")}</datalist>
+      <p class="note" id="lf-hint" style="margin:6px 0 0" hidden></p>
+      <label for="lf-sets">Sets <span class="faint">(e.g. 185x8, 185x8, 180x7)</span></label>
+      <input id="lf-sets" placeholder="185x8, 185x8"/>`;
+    // Typing a name you have lifted before pulls last time up straight away.
+    const hint=$("#lf-hint");
+    $("#lf-name").oninput=()=>{
+      const st=exerciseStats($("#lf-name").value);
+      if(st){ hint.hidden=false; hint.textContent=overloadHint(null, st); }
+      else hint.hidden=true;
+    };
+  }
+
+  const parseSets = v => [...String(v).matchAll(/(\d+(?:\.\d+)?)\s*[x×]\s*(\d+)/gi)]
+    .map(m=>({weight:+m[1], reps:+m[2]}));
+
+  $("#entry-form").onsubmit=e=>{
+    e.preventDefault();
+    let exercises=[];
+    if(list){
+      list.forEach((ex,i)=>{
+        const sets=parseSets($("#lf-"+i).value);
+        if(sets.length) exercises.push({name:ex.name, sets});
+      });
+      if(!exercises.length){ $("#lf-0").focus(); return; }
+    }else{
+      const name=$("#lf-name").value.trim(); if(!name){ $("#lf-name").focus(); return; }
+      exercises=[{name, sets:parseSets($("#lf-sets").value)}];
+    }
+    const l=DB.get("lifts",[]);
+    l.unshift({id:uid(), date:new Date().toISOString(), routine:routine?routine.id:null, exercises});
+    DB.set("lifts",l);
+    $("#entry-dialog").close();
+    toast(list?`${routine.name} logged`:"Lift logged");
+    renderFitness();
+  };
+  openDialog($("#entry-dialog"));
+  setTimeout(()=>(list?$("#lf-0"):$("#lf-name")).focus(),40);
 }
 
 // Weight capture — one number, so it saves straight from the dialog. One

@@ -8,9 +8,25 @@ serves `index.html` at `/`). All data is stored locally in the browser under
 ## Sections
 - **Command** — orbital-core hero, quick actions grouped into All / Personal /
   Planning / Business tabs, coach signals, daily vitals.
-- **Fitness** — lifts + MMA / mat work, a repeating weekly plan, and a rules
-  coach that cross-references training, food and rest. Includes the Obsidian
-  importer.
+- **Fitness** — four screens behind one command bar: **Today**, **Program**,
+  **Progress** and **History**.
+  - *Today* lists the routines your program puts on this weekday, each exercise
+    showing what you lifted for it last time, and logs the whole routine in one
+    pass. A routine you have already trained is marked done.
+  - *Program* is the week itself. Assign any number of routines to each day —
+    lifting, mat work, plyos, conditioning — and leave a day empty for rest.
+    The routine library underneath is editable: build one from a plain
+    `Bench Press 4x8` list, rename it, delete it.
+  - *Progress* is the progressive-overload view. Per exercise: last session's
+    sets, best set, estimated 1RM (Epley), total volume with the change since
+    the session before, and a sparkline. When you log, each exercise carries a
+    hint drawn from your own last session — hold the weight and chase a rep, or
+    add weight once you hit the top of the range.
+  - *History* holds the weight trend, recent sessions and lifts, and the
+    Obsidian importer.
+
+  The program feeds the rest of the app: today's training shows in the coach and
+  in Command's **Up next**, and the week ahead appears on the Calendar.
 - **Food** — a full food log. Meals (Breakfast/Lunch/Dinner/Snacks), a macro
   ring by calorie share, percent-of-goal bars, and the whole nutrition panel
   (20 nutrients, indented sub-rows, derived Net Carbs). Sources: History, My
@@ -39,11 +55,15 @@ the day you are looking at. Command and the coach always speak about today.
 - **Planner** — tasks with an optional due date and priority, grouped Overdue /
   Today / Tomorrow / This week / Later / No date, filtered Open / Done / All.
 - **Calendar** — events with a real date and time, grouped chronologically and
-  filtered Upcoming / Past / All.
+  filtered Upcoming / Past / All. The week ahead of training from your Fitness
+  program shows alongside them, ticked off once the session is logged. Those
+  rows are derived from the program, so they are read-only here — change them on
+  Fitness → Program.
 - **Journal / Reselling / Money** — quick capture lists.
 
-Command's **Up next** merges open tasks and scheduled events into one ordered
-list, soonest first, and the coach counts anything overdue.
+Command's **Up next** merges open tasks, scheduled events and today's and
+tomorrow's training into one ordered list, soonest first, and the coach counts
+anything overdue.
 
 ## Obsidian
 Paste daily notes into the importer (Fitness → Import Obsidian) and it reads

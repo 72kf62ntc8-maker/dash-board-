@@ -18,7 +18,11 @@ serves `index.html` at `/`). All data is stored locally in the browser under
   searchable at once. Enter a label once with **Create a food** and logging it
   again is a tap plus a serving count. Also quick add, a voice log that uses
   the browser's own speech recognition, and water with quick-add presets and a
-  unit switch.
+  unit switch. **Carb cycling** is optional: turn it on and a day runs High /
+  Mid / Low targets (2800 / 2500 / 2100 by default, all editable) from a
+  repeating weekly rotation, with a one-off override when a training day moves
+  and a "Match my training plan" button that builds the rotation from the week
+  you actually train.
 - **Steps** — daily goal ring, 7-day chart, and an Apple Shortcut recipe that
   pushes Health's step count in via `?steps=NNNN`.
 

@@ -273,6 +273,30 @@
   .coach-good{border-left-color:var(--success);color:#a4e8cc}
   .coach-info{border-left-color:var(--rim-strong);color:var(--muted)}
 
+  /* ---- Carb cycle ---- */
+  .switch{display:flex;align-items:center;gap:9px;border:1px solid var(--rim);background:var(--s2);
+    padding:5px 12px 5px 6px;border-radius:99px;font-size:12px;color:var(--muted);
+    transition:background var(--dur),border-color var(--dur),color var(--dur)}
+  .switch:hover{border-color:var(--rim-strong);color:var(--text)}
+  .switch .knob{width:30px;height:17px;border-radius:99px;background:var(--s3);
+    border:1px solid var(--rim);position:relative;flex:none;transition:background var(--dur),border-color var(--dur)}
+  .switch .knob::after{content:'';position:absolute;top:2px;left:2px;width:11px;height:11px;border-radius:50%;
+    background:var(--faint);transition:transform var(--dur),background var(--dur)}
+  .switch[aria-pressed="true"]{color:var(--lav);border-color:var(--rim-strong)}
+  .switch[aria-pressed="true"] .knob{background:var(--tint);border-color:var(--accent)}
+  .switch[aria-pressed="true"] .knob::after{transform:translateX(13px);background:var(--accent)}
+
+  .typerow{display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+    padding:10px 0;border-top:1px solid var(--rim)}
+  .typerow .lab{width:42px;font-weight:600;font-size:14px;flex:none}
+  .typerow.today .lab{color:var(--accent)}
+  .typerow .macros{margin-left:auto;font:11px ui-monospace,"Courier New",monospace;
+    letter-spacing:.8px;color:var(--muted);white-space:nowrap}
+  .daytype{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--rim-strong);
+    background:var(--tint);color:var(--lav);border-radius:99px;padding:4px 12px;
+    font:11px ui-monospace,"Courier New",monospace;letter-spacing:1.4px}
+  .daytype b{font-weight:600;color:var(--accent)}
+
   /* ---- Day strip ---- */
   .daynav{display:flex;align-items:center;gap:8px}
   .daynav button[data-day="-1"],.daynav button[data-day="1"]{
@@ -639,7 +663,69 @@ function applyMotion(){
 
 // ---- Targets (editable on the Food screen) ----
 const DEFAULT_TARGETS = { calories:2200, protein:200, carbs:220, fat:70 };
-const getTargets = ()=>({ ...DEFAULT_TARGETS, ...DB.get("targets", {}) });
+
+// ---------------------------------------------------------------------------
+// CARB CYCLING
+//
+// Instead of one target every day, a day is one of three types and each type
+// carries its own macros. Protein holds steady across all three — you keep
+// training on the low days — while carbs do the swinging and fat moves the
+// other way to make up some of the difference. That is the whole mechanism.
+//
+// Which type a given date is comes from a repeating weekly pattern, with a
+// one-off override when a training day moves. Turned off, nothing changes:
+// targets come from the single set on the Food screen exactly as before.
+// ---------------------------------------------------------------------------
+const DAY_TYPES = ["high","mid","low"];
+const DEFAULT_DAY_TYPES = {
+  high:{label:"High", calories:2800, protein:200, carbs:350, fat:67},
+  mid: {label:"Mid",  calories:2500, protein:200, carbs:275, fat:67},
+  low: {label:"Low",  calories:2100, protein:200, carbs:150, fat:78},
+};
+function getDayTypes(){
+  const saved=DB.get("dayTypes",{}); const out={};
+  DAY_TYPES.forEach(k=>out[k]={...DEFAULT_DAY_TYPES[k], ...(saved[k]||{})});
+  return out;
+}
+// A rotation that puts the high days on the two heaviest sessions and keeps a
+// low day either side of them. Editable, and "Match my training plan" will
+// rewrite it from the week you actually train.
+const DEFAULT_CARB_WEEK = {Mon:"high",Tue:"low",Wed:"mid",Thu:"low",Fri:"high",Sat:"mid",Sun:"low"};
+const getCarbWeek   = ()=>({...DEFAULT_CARB_WEEK, ...DB.get("carbWeek",{})});
+const carbCycleOn   = ()=>DB.get("carbCycle", false);
+const getDayOverrides = ()=>DB.get("dayTypeOverride",{});
+
+/** The type a date is: a one-off override first, then the weekly pattern. */
+function dayTypeFor(day=todayKey()){
+  if(!carbCycleOn()) return null;
+  const o=getDayOverrides()[day];
+  if(DAY_TYPES.includes(o)) return o;
+  const label=DAY_LABELS[dayIdx(new Date(day+"T12:00:00"))];
+  const t=getCarbWeek()[label];
+  return DAY_TYPES.includes(t) ? t : null;
+}
+
+/**
+ * Targets for a date. With cycling on this is the day's type; with it off it
+ * is the single editable set, which is what every caller used to get — so
+ * passing no day still means "today" and nothing else had to change.
+ */
+function getTargets(day=todayKey()){
+  const t=dayTypeFor(day);
+  if(t){
+    const d=getDayTypes()[t];
+    return {calories:+d.calories||0, protein:+d.protein||0, carbs:+d.carbs||0, fat:+d.fat||0};
+  }
+  return { ...DEFAULT_TARGETS, ...DB.get("targets", {}) };
+}
+/** Average daily calories over the planned week — the number that decides
+ *  whether you are actually in a deficit, which no single day tells you. */
+function carbWeekAverage(){
+  const w=getCarbWeek(), types=getDayTypes();
+  const vals=DAY_LABELS.map(d=>DAY_TYPES.includes(w[d]) ? +types[w[d]].calories||0 : null).filter(v=>v!==null);
+  if(!vals.length) return null;
+  return Math.round(vals.reduce((a,v)=>a+v,0)/vals.length);
+}
 
 // ---- Nutrition helpers ----
 function foodTotals(list){
@@ -975,6 +1061,13 @@ function runCoach(){
   // being a fixed pounds number.
   const pctWeek = (rate!=null&&trendWeight) ? Math.abs(rate)/trendWeight*100 : null;
 
+  // Which kind of day this is, when carb cycling is running.
+  const dt=dayTypeFor(day);
+  if(dt){
+    const d=getDayTypes()[dt];
+    out.push([`${d.label} day — ${(+d.calories||0).toLocaleString()} cal, ${+d.carbs||0}g carbs.`,"info"]);
+  }
+
   // Plan for today
   const pt=plannedToday(plan);
   const trainedToday = mma.some(s=>todayKey(new Date(s.date))===day) || lifts.some(w=>todayKey(new Date(w.date))===day);
@@ -994,6 +1087,13 @@ function runCoach(){
   if(streak>6) out.push([`${streak} days straight without a rest day — take one.`,"warn"]);
   // Protein behind, later in the day
   if(new Date().getHours()>=18 && totals.protein < t.protein-10) out.push([`Behind on protein — ${Math.round(t.protein-totals.protein)}g to go.`,"warn"]);
+  // Carb cycling only works if the swing actually happens — a high day eaten
+  // like a low one is just a deficit, and a low day eaten like a high one
+  // undoes the point of it.
+  if(dt==="high" && new Date().getHours()>=18 && totals.carbs < t.carbs-40)
+    out.push([`High day with ${Math.round(t.carbs-totals.carbs)}g of carbs still to go — fuel it.`,"warn"]);
+  if(dt==="low" && totals.carbs > t.carbs+40)
+    out.push([`Low day, but ${Math.round(totals.carbs-t.carbs)}g over on carbs.`,"warn"]);
   // Fuel a mat day
   const matMin=mma.filter(s=>todayKey(new Date(s.date))===day).reduce((a,s)=>a+(+s.minutes||0),0);
   if(matMin>=45 && totals.protein < t.protein-10) out.push([`${matMin} min on the mat today — still ${Math.round(t.protein-totals.protein)}g of protein to go.`,"warn"]);
@@ -1258,7 +1358,9 @@ function renderCommand(){
         ${coach.map(c=>`<p class="coach-line coach-${c[1]}">${esc(c[0])}</p>`).join("")}
       </div>
       <div class="panel">
-        <div class="section-title"><h2>Daily vitals</h2><button class="ghost" onclick="show('Food')">Open →</button></div>
+        <div class="section-title"><h2>Daily vitals</h2>
+          ${dayTypeFor() ? `<span class="tag">${esc(getDayTypes()[dayTypeFor()].label.toUpperCase())} DAY</span>` : ""}
+          <button class="ghost" onclick="show('Food')">Open →</button></div>
         <div class="rings">
           ${ring(totals.calories,t.calories,"KCAL","")}
           ${ring(totals.protein,t.protein,"PROTEIN","g")}
@@ -1444,7 +1546,7 @@ function renderFitness(){
 // ============================================================================
 function renderFood(){
   const day=viewDay; const log=DB.get("foodLog",{}); const foods=log[day]||[];
-  const totals=foodTotals(foods); const t=getTargets();
+  const totals=foodTotals(foods); const t=getTargets(day);
   const dayNutrition=sumNutrition(foods);
 
   // Group the day by meal. Entries logged before meals existed have no meal,
@@ -1454,6 +1556,7 @@ function renderFood(){
   if(loose.length) groups.push({name:"Uncategorised", items:loose, loose:true});
 
   const w=waterOn(day), wGoal=getWaterGoal(), unit=getWaterUnit(), u=WATER_UNITS[unit];
+  const dayType=dayTypeFor(day), types=getDayTypes();
   const inUnit=v=>{ const n=v/u.per; return n>=100?Math.round(n):+n.toFixed(n<10?1:0); };
 
   $("#view-food").innerHTML = `
@@ -1473,9 +1576,13 @@ function renderFood(){
             ? `${Math.round(t.calories-totals.calories).toLocaleString()} calories left of ${t.calories.toLocaleString()}.`
             : `${Math.round(totals.calories-t.calories).toLocaleString()} calories over ${t.calories.toLocaleString()}.`}
         </p>
+        ${dayType ? `<div class="row" style="margin-top:12px;gap:12px;flex-wrap:wrap">
+          <span class="daytype"><b>${esc(types[dayType].label.toUpperCase())} DAY</b> · ${(+types[dayType].carbs||0)}G CARBS</span>
+          <button class="ghost" id="food-daytype">Change just this day</button>
+        </div>` : ""}
         <div class="row" style="margin-top:14px;gap:14px;flex-wrap:wrap">
           <button class="btn" id="food-obsidian">Import Obsidian</button>
-          <button class="ghost" id="food-targets">Edit targets</button>
+          <button class="ghost" id="food-targets">${carbCycleOn()?"Edit day types":"Edit targets"}</button>
         </div>
       </div>
 
@@ -1494,6 +1601,33 @@ function renderFood(){
           </div>
         </div>
       </div>
+    </div>
+
+    <div class="panel">
+      <div class="section-title">
+        <h2>Carb cycle</h2>
+        <button class="switch" id="cc-toggle" aria-pressed="${carbCycleOn()}">
+          <span class="knob" aria-hidden="true"></span><span>${carbCycleOn()?"On":"Off"}</span>
+        </button>
+      </div>
+      ${carbCycleOn() ? `
+        <p class="muted" style="font-size:13.5px;margin:0 0 6px">
+          Each day runs its own targets. Protein holds steady; carbs do the swinging.
+          ${carbWeekAverage()!=null?`Averages <strong>${carbWeekAverage().toLocaleString()} cal/day</strong> across the week.`:""}
+        </p>
+        <div id="cc-week"></div>
+        <div class="row" style="margin-top:14px;gap:14px;flex-wrap:wrap">
+          <button class="btn" id="cc-match">Match my training plan</button>
+          <button class="ghost" id="cc-edit">Edit day types</button>
+        </div>`
+      : `
+        <p class="muted" style="font-size:13.5px;margin:0">
+          Turn this on to run a high / mid / low rotation instead of one target every day —
+          ${(+getDayTypes().high.calories).toLocaleString()} on a high day,
+          ${(+getDayTypes().mid.calories).toLocaleString()} mid,
+          ${(+getDayTypes().low.calories).toLocaleString()} low by default, all editable.
+          Your single target set stays where it is and comes back if you turn this off.
+        </p>`}
     </div>
 
     <div class="panel">
@@ -1529,19 +1663,159 @@ function renderFood(){
 
   $("#food-add").onclick=()=>openBrowse();
   $("#food-obsidian").onclick=openObsidian;
-  $("#food-targets").onclick=openTargets;
+  $("#food-targets").onclick=()=>carbCycleOn()?openDayTypes():openTargets();
   $("#water-settings").onclick=openWaterSettings;
   $("#water-custom").onclick=openWater;
   const undo=$("#water-undo"); if(undo) undo.onclick=()=>{ const wt=getWater(); delete wt[viewDay]; DB.set("water",wt); renderFood(); toast("Water cleared"); };
   $("#nf-toggle").onclick=()=>{ DB.set("nfOpen",!DB.get("nfOpen",false)); renderFood(); };
   daySubtitle("Today against your targets.", "{d} — against your targets.");
   wireDayStrip($("#view-food"), renderFood);
+  $("#cc-toggle").onclick=()=>{ DB.set("carbCycle", !carbCycleOn()); renderFood();
+    toast(carbCycleOn()?"Carb cycling on":"Back to a single target"); };
+  if($("#food-daytype")) $("#food-daytype").onclick=()=>openDayOverride(day);
+  if($("#cc-edit"))  $("#cc-edit").onclick=openDayTypes;
+  if($("#cc-match")) $("#cc-match").onclick=matchTrainingPlan;
+  renderCarbWeek();
   $("#view-food").querySelectorAll("[data-water]").forEach(b=>b.onclick=()=>{ addWater(+b.dataset.water, viewDay); renderFood(); });
   $("#view-food").querySelectorAll("[data-addmeal]").forEach(b=>b.onclick=()=>openBrowse(b.dataset.addmeal));
   $("#view-food").querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>openLoggedEntry(+b.dataset.edit));
   $("#view-food").querySelectorAll("[data-food]").forEach(b=>b.onclick=()=>{
     const l=DB.get("foodLog",{}); (l[viewDay]||[]).splice(+b.dataset.food,1); DB.set("foodLog",l);
     renderFood(); toast("Removed"); });
+}
+
+// ---- The week planner: one row per weekday, three types to choose from ----
+function renderCarbWeek(){
+  const host=$("#cc-week"); if(!host) return;
+  host.innerHTML="";
+  const week=getCarbWeek(), types=getDayTypes();
+  const todayLabel=DAY_LABELS[dayIdx(new Date())];
+  // A one-off override on today would otherwise read as a contradiction — the
+  // row saying Low while the panel above says High — so name it on the row.
+  const todayOverride=getDayOverrides()[todayKey()];
+  DAY_LABELS.forEach(d=>{
+    const row=document.createElement("div");
+    row.className="typerow"+(d===todayLabel?" today":"");
+    const sel=week[d];
+    const overridden = d===todayLabel && DAY_TYPES.includes(todayOverride) && todayOverride!==sel;
+    row.innerHTML=`<span class="lab">${esc(d)}${d===todayLabel?" •":""}</span>
+      <span class="chip-row"></span>
+      ${overridden?`<span class="tag" style="margin-left:auto">TODAY CHANGED TO ${esc(types[todayOverride].label.toUpperCase())}</span>`:""}
+      <span class="macros"${overridden?' style="margin-left:14px"':""}>${sel&&types[sel]
+        ? `${(+types[sel].calories||0).toLocaleString()} CAL · ${+types[sel].carbs||0}C ${+types[sel].protein||0}P ${+types[sel].fat||0}F`
+        : "NO TARGET"}</span>`;
+    const chips=row.querySelector(".chip-row");
+    DAY_TYPES.forEach(k=>{
+      const c=document.createElement("button");
+      c.type="button"; c.className="chip"+(sel===k?" on":"");
+      c.setAttribute("aria-pressed", String(sel===k));
+      c.textContent=types[k].label;
+      c.onclick=()=>{
+        const w=DB.get("carbWeek", {});
+        // Tapping the type a day already is clears it, so a day can opt out of
+        // the rotation entirely rather than being forced into one of three.
+        w[d] = (getCarbWeek()[d]===k) ? "" : k;
+        DB.set("carbWeek", w); renderFood();
+      };
+      chips.append(c);
+    });
+    host.append(row);
+  });
+}
+
+/**
+ * Rewrite the rotation from the training week you already keep on Fitness:
+ * the heaviest days eat the most. Two or more sessions is a high day, one is
+ * a mid day, a rest day (or an empty one) is low.
+ */
+function matchTrainingPlan(){
+  const plan=DB.get("plan", DEFAULT_PLAN); const w={};
+  DAY_LABELS.forEach(d=>{
+    const slots=(plan[d]||[]).filter(x=>x!=="rest");
+    w[d] = slots.length>=2 ? "high" : slots.length===1 ? "mid" : "low";
+  });
+  DB.set("carbWeek", w); renderFood();
+  toast("Rotation matched to your training week");
+}
+
+// ---- Editing the three day types ----
+function openDayTypes(){
+  const types=getDayTypes();
+  $("#entry-title").textContent="Day types";
+  $("#entry-fields").innerHTML=`
+    <p class="note" style="margin-top:12px">Protein normally stays the same on every day — you are still
+    training on the low days. Carbs carry the swing, and fat usually comes up a little as they come down.</p>
+    ${DAY_TYPES.map(k=>{
+      const d=types[k];
+      return `<p class="tag" style="margin:18px 0 2px">${esc(d.label.toUpperCase())} DAY</p>
+        <div class="row" style="gap:10px">
+          <div style="flex:1"><label for="dt-${k}-calories">Calories</label><input id="dt-${k}-calories" inputmode="numeric" value="${+d.calories||0}"/></div>
+          <div style="flex:1"><label for="dt-${k}-protein">Protein (g)</label><input id="dt-${k}-protein" inputmode="numeric" value="${+d.protein||0}"/></div>
+        </div>
+        <div class="row" style="gap:10px">
+          <div style="flex:1"><label for="dt-${k}-carbs">Carbs (g)</label><input id="dt-${k}-carbs" inputmode="numeric" value="${+d.carbs||0}"/></div>
+          <div style="flex:1"><label for="dt-${k}-fat">Fat (g)</label><input id="dt-${k}-fat" inputmode="numeric" value="${+d.fat||0}"/></div>
+        </div>
+        <p class="faint" id="dt-${k}-sum" style="font-size:12px;margin:6px 0 0"></p>`;
+    }).join("")}`;
+  // Macros that add up to something far from the calorie figure is the easiest
+  // mistake to make here, so the sum is shown as you type rather than silently
+  // corrected — you may well want them to disagree.
+  const sums=()=>DAY_TYPES.forEach(k=>{
+    const g=f=>parseFloat($(`#dt-${k}-${f}`).value)||0;
+    const kcal=g("protein")*4+g("carbs")*4+g("fat")*9;
+    const target=g("calories"); const diff=Math.round(kcal-target);
+    $(`#dt-${k}-sum`).textContent = `Those macros come to ${Math.round(kcal).toLocaleString()} cal`
+      + (Math.abs(diff)<=50 ? " — matches." : ` — ${Math.abs(diff)} ${diff>0?"over":"under"} the calorie figure.`);
+  });
+  DAY_TYPES.forEach(k=>["calories","protein","carbs","fat"].forEach(f=>{ $(`#dt-${k}-${f}`).oninput=sums; }));
+  sums();
+  $("#entry-form").onsubmit=e=>{
+    e.preventDefault();
+    const out={};
+    DAY_TYPES.forEach(k=>{
+      const g=f=>{ const v=parseFloat($(`#dt-${k}-${f}`).value); return isFinite(v)&&v>=0 ? v : DEFAULT_DAY_TYPES[k][f]; };
+      out[k]={label:DEFAULT_DAY_TYPES[k].label, calories:g("calories"), protein:g("protein"), carbs:g("carbs"), fat:g("fat")};
+    });
+    DB.set("dayTypes", out);
+    $("#entry-dialog").close(); toast("Day types saved"); renderFood();
+  };
+  openDialog($("#entry-dialog"));
+}
+
+// ---- Moving one date off the rotation, for when training moves ----
+function openDayOverride(day){
+  const types=getDayTypes(), cur=dayTypeFor(day);
+  const label=new Date(day+"T12:00:00").toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"});
+  const overridden=DAY_TYPES.includes(getDayOverrides()[day]);
+  $("#entry-title").textContent="Day type";
+  $("#entry-fields").innerHTML=`
+    <p class="muted" style="font-size:13.5px;margin:12px 0 0">${esc(label)}</p>
+    <label>Type</label><div class="chip-row" id="do-chips"></div>
+    <p class="note">Changes this date only. The weekly rotation is untouched, so next ${esc(DAY_LABELS[dayIdx(new Date(day+"T12:00:00"))])} is whatever the pattern says.</p>
+    ${overridden?`<button type="button" class="ghost" id="do-clear">Back to the weekly pattern</button>`:""}`;
+  let pick=cur;
+  const chips=$("#do-chips");
+  DAY_TYPES.forEach(k=>{
+    const c=document.createElement("button");
+    c.type="button"; c.className="chip"+(pick===k?" on":"");
+    c.setAttribute("aria-pressed", String(pick===k));
+    c.textContent=`${types[k].label} · ${(+types[k].calories||0).toLocaleString()}`;
+    c.onclick=()=>{ pick=k;
+      [...chips.children].forEach(x=>{ x.classList.remove("on"); x.setAttribute("aria-pressed","false"); });
+      c.classList.add("on"); c.setAttribute("aria-pressed","true"); };
+    chips.append(c);
+  });
+  if($("#do-clear")) $("#do-clear").onclick=()=>{
+    const o=getDayOverrides(); delete o[day]; DB.set("dayTypeOverride",o);
+    $("#entry-dialog").close(); toast("Back to the weekly pattern"); renderFood();
+  };
+  $("#entry-form").onsubmit=e=>{
+    e.preventDefault(); if(!pick) return;
+    const o=getDayOverrides(); o[day]=pick; DB.set("dayTypeOverride",o);
+    $("#entry-dialog").close(); toast(`${types[pick].label} day`); renderFood();
+  };
+  openDialog($("#entry-dialog"));
 }
 
 /** Macro ring: three arcs sized by each macro's share of the calories. */
@@ -1995,7 +2269,7 @@ function paintDetail(){
       </div>
     </div>
     <div class="section-title" style="margin:22px 0 12px"><h2>Percent of daily goals</h2></div>
-    ${goalBars(n,getTargets())}
+    ${goalBars(n,getTargets(viewDay))}
     <div class="section-title" style="margin:24px 0 4px"><h2>Nutrition facts</h2>
       <button type="button" class="ghost" id="d-nf" aria-expanded="${detailNfOpen}" aria-controls="d-nf-body">${detailNfOpen?"Hide":"Show"}</button></div>
     <div id="d-nf-body" ${detailNfOpen?"":"hidden"}>${nutritionFacts(n)}</div>`;

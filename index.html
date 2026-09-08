@@ -55,6 +55,9 @@
     --faint:#6d5f93;   /* placeholders, disabled, meta */
 
     --success:#4ed8a0; --warn:#e9b44c; --danger:#ff6b8a;
+    /* Macro chart slices. Three distinguishable steps along the violet ramp;
+       every slice is labelled too, so colour is never the only cue. */
+    --mac-carbs:#9b5cff; --mac-fat:#e8dfff; --mac-protein:#6c7bff;
     --radius:12px; --radius-sm:8px;
     --dur:.16s;
   }
@@ -270,10 +273,79 @@
   .coach-good{border-left-color:var(--success);color:#a4e8cc}
   .coach-info{border-left-color:var(--rim-strong);color:var(--muted)}
 
+  /* ---- Food ---- */
+  .meal-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;
+    padding:14px 0 8px;border-top:1px solid var(--rim)}
+  .meal-head:first-child{border-top:0;padding-top:0}
+  .meal-head h3{font-size:15px;font-weight:600;margin:0}
+  .meal-kcal{font:11px ui-monospace,"Courier New",monospace;letter-spacing:1.2px;color:var(--muted)}
+  .macro-row{display:flex;align-items:center;gap:26px;flex-wrap:wrap}
+  .donut{position:relative;width:150px;height:150px;flex:none}
+  .donut .mid{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+  .donut .mid b{font-size:26px;font-weight:600;line-height:1}
+  .donut .mid small{font:9px ui-monospace,"Courier New",monospace;letter-spacing:1.6px;color:var(--muted);margin-top:4px}
+  .macro-legend{display:flex;gap:26px;flex-wrap:wrap}
+  .macro-legend div{min-width:64px}
+  .macro-legend .pct{font-size:13px;font-weight:600}
+  .macro-legend .g{font-size:20px;font-weight:600;margin-top:1px}
+  .macro-legend .n{font-size:12px;color:var(--muted)}
+  /* Percent-of-goal bars: four slim tracks, one per target. */
+  .goalbars{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  .goalbars .track{height:5px;border-radius:99px;background:var(--s3);overflow:hidden}
+  .goalbars .fill{height:100%;border-radius:99px;background:var(--accent)}
+  .goalbars .fill.over{background:var(--warn)}
+  .goalbars .p{font-size:13px;margin-top:7px;font-weight:600}
+  .goalbars .n{font-size:12px;color:var(--muted)}
+
+  /* Nutrition facts: main rows flush, sub-nutrients indented and dimmed. */
+  .nf{display:flex;justify-content:space-between;gap:16px;padding:9px 0;border-top:1px solid var(--rim);font-size:14px}
+  .nf:first-child{border-top:0}
+  .nf.main{font-weight:600}
+  .nf.sub{padding-left:20px;color:var(--muted);font-size:13.5px}
+  .nf .v{white-space:nowrap}
+
+  /* Food browser */
+  .subtabs{display:flex;gap:18px;border-bottom:1px solid var(--rim);margin:14px 0 0;overflow:auto;scrollbar-width:none}
+  .subtabs::-webkit-scrollbar{display:none}
+  .subtabs button{padding:9px 1px;font-size:14px;color:var(--muted);white-space:nowrap;
+    border-bottom:2px solid transparent;margin-bottom:-1px;transition:color var(--dur),border-color var(--dur)}
+  .subtabs button:hover{color:var(--text)}
+  .subtabs button[aria-selected="true"]{color:var(--lav);font-weight:600;border-bottom-color:var(--accent)}
+  .capture{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:14px 0}
+  .capture button{display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 4px;
+    border:1px solid var(--rim);background:var(--s2);border-radius:var(--radius-sm);
+    font-size:12px;color:var(--accent);transition:background var(--dur),border-color var(--dur)}
+  .capture button:hover{background:var(--s3);border-color:var(--rim-strong)}
+  .capture .i{width:19px;height:19px}
+  .picklist{display:grid;gap:6px;max-height:44vh;overflow:auto;margin-top:4px;padding-right:2px}
+  .pick{display:flex;align-items:center;gap:12px;padding:11px 13px;border:1px solid var(--rim);
+    background:var(--s2);border-radius:var(--radius-sm);text-align:left;width:100%;
+    transition:background var(--dur),border-color var(--dur)}
+  .pick:hover{background:var(--s3);border-color:var(--rim-strong)}
+  .pick .open{flex:1;min-width:0;display:flex;align-items:center;gap:12px;
+    padding:11px 13px;margin:-11px 0 -11px -13px;background:none;border:0;color:inherit;text-align:left}
+  .pick .body{flex:1;min-width:0}
+  .pick strong{display:block;font-size:14px;font-weight:500;overflow-wrap:anywhere}
+  .pick small{display:block;color:var(--muted);font-size:12.5px;margin-top:2px}
+  .pick .add{display:flex;color:var(--accent);border:1px solid var(--rim-strong);border-radius:50%;padding:5px;flex:none}
+  .pick .add .i{width:15px;height:15px}
+  .badge{display:inline-flex;align-items:center;vertical-align:-2px;margin-left:6px;color:var(--success)}
+  .badge .i{width:14px;height:14px}
+  .fieldrow{display:flex;justify-content:space-between;align-items:center;gap:14px;
+    padding:12px 0;border-top:1px solid var(--rim)}
+  .fieldrow > span{font-size:14px}
+  .fieldrow input,.fieldrow select{width:auto;min-width:120px;max-width:190px;text-align:right;padding:8px 10px;font-size:14px}
+  .presets{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+  .note{font-size:12.5px;color:var(--muted);margin:10px 0 0;padding-left:11px;border-left:2px solid var(--rim-strong)}
+
   /* ---- Dialogs ---- */
-  dialog{width:min(480px,calc(100% - 28px));border:1px solid var(--rim-strong);border-radius:var(--radius);
+  dialog.wide{width:min(680px,calc(100% - 28px))}
+  dialog{width:min(480px,calc(100% - 28px));max-height:88vh;overflow:auto;border:1px solid var(--rim-strong);border-radius:var(--radius);
     background:rgba(20,14,36,.97);backdrop-filter:blur(18px);color:var(--text);padding:24px;
     box-shadow:0 30px 70px -25px rgba(0,0,0,.9)}
+  /* The browser and detail dialogs are tall: keep their header and footer put
+     and scroll only the middle, so Log is always reachable. */
+  .dialog-scroll{overflow:auto;max-height:62vh;margin:0 -4px;padding:0 4px}
   dialog::backdrop{background:rgba(5,3,11,.78);backdrop-filter:blur(4px)}
   .dialog-top{display:flex;justify-content:space-between;align-items:center;gap:10px}
   .dialog-top h2{font-size:20px;margin:0}
@@ -330,6 +402,15 @@
     .hero h2{font-size:25px}
     .core-wrap{width:150px;height:150px;align-self:center}
     .rings{gap:14px;justify-content:center}
+    .goalbars{grid-template-columns:repeat(2,1fr)}
+    .capture{grid-template-columns:repeat(2,1fr)}
+    .macro-row{gap:18px}
+    .donut{width:130px;height:130px}
+    .fieldrow{flex-wrap:wrap}
+    .fieldrow input,.fieldrow select{max-width:none;flex:1}
+    .subtabs{gap:13px}
+    .subtabs button{font-size:13.5px}
+    .dialog-scroll{max-height:52vh}
     /* On a phone the four tab labels only fit without their counts, and a
        label you can read beats a tally you can't. */
     .tabs{padding:3px}
@@ -397,6 +478,46 @@
   </form>
 </dialog>
 
+<!-- Food browser: search, tabs, quick capture, one-tap re-log -->
+<dialog id="browse-dialog" class="wide" aria-labelledby="browse-title">
+  <div class="dialog-top">
+    <h2 id="browse-title">Add food</h2>
+    <button type="button" class="close" data-close aria-label="Close"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+  </div>
+  <div class="fieldrow" style="border-top:0;padding-top:14px">
+    <span><label for="browse-meal" style="margin:0">Meal</label></span>
+    <select id="browse-meal"></select>
+  </div>
+  <label class="sr-only" for="browse-search">Search foods</label>
+  <input id="browse-search" type="search" autocomplete="off" placeholder="Search foods, brands, flavors…" />
+  <div class="subtabs" id="browse-tabs" role="tablist" aria-label="Food sources"></div>
+  <div class="capture" id="browse-capture"></div>
+  <div class="section-title" style="margin:4px 0 8px">
+    <h2 id="browse-listname" style="font-size:15px">Recently logged</h2>
+    <button type="button" class="ghost" id="browse-sort"></button>
+  </div>
+  <div class="picklist" id="browse-list" role="tabpanel"></div>
+  <p class="note" id="browse-note" hidden></p>
+</dialog>
+
+<!-- Food detail: servings, macros, percent of goals, full nutrition facts -->
+<dialog id="detail-dialog" class="wide" aria-labelledby="detail-title">
+  <div class="dialog-top">
+    <div style="min-width:0">
+      <h2 id="detail-title">Food</h2>
+      <p class="muted" id="detail-brand" style="font-size:13px;margin:3px 0 0"></p>
+    </div>
+    <button type="button" class="close" data-close aria-label="Close"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+  </div>
+  <form id="detail-form" method="dialog">
+    <div class="dialog-scroll"><div id="detail-body"></div></div>
+    <div class="dialog-actions">
+      <button type="button" class="btn" data-close>Cancel</button>
+      <button type="submit" class="primary" id="detail-log">Log it</button>
+    </div>
+  </form>
+</dialog>
+
 <!-- Obsidian import -->
 <dialog id="obsidian-dialog" aria-labelledby="obsidian-title">
   <div class="dialog-top"><h2 id="obsidian-title">Import from Obsidian</h2><button type="button" class="close" data-close aria-label="Close"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
@@ -453,6 +574,15 @@ const ICONS = {
   play:     '<path d="M8 5.4 18.2 12 8 18.6Z"/>',
   pause:    '<path d="M9 5.5v13M15 5.5v13"/>',
   x:        '<path d="M6 6l12 12M18 6 6 18"/>',
+  mic:      '<rect x="9" y="2.8" width="6" height="11" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3.2M8.5 21.2h7"/>',
+  camera:   '<path d="M4 8.5V6.2a2 2 0 0 1 2-2h2M16 4.2h2a2 2 0 0 1 2 2v2.3M20 15.5v2.3a2 2 0 0 1-2 2h-2M8 19.8H6a2 2 0 0 1-2-2v-2.3"/><circle cx="12" cy="12" r="3.4"/>',
+  bolt:     '<circle cx="10.5" cy="10.5" r="6"/><path d="m15 15 5 5M10.5 7.8v5.4M7.8 10.5h5.4"/>',
+  water:    '<path d="M12 3.2s6 6.4 6 10.3a6 6 0 0 1-12 0c0-3.9 6-10.3 6-10.3Z"/>',
+  chevron:  '<path d="m6 9.5 6 6 6-6"/>',
+  edit:     '<path d="M4 20.2h4L19.6 8.6a2.7 2.7 0 0 0-3.8-3.8L4.2 16.4Z"/><path d="m14.6 6 3.8 3.8"/>',
+  verified: '<path d="m12 3 6.5 2.6v5.2c0 4-2.7 7.6-6.5 9-3.8-1.4-6.5-5-6.5-9V5.6Z"/><path d="m9.2 11.8 2 2 3.6-3.9"/>',
+  book:     '<path d="M4 5.2A2.2 2.2 0 0 1 6.2 3H19v14.5H6.2A2.2 2.2 0 0 0 4 19.7Z"/><path d="M4 19.7A2.2 2.2 0 0 1 6.2 17.5H19V21H6.2A2.2 2.2 0 0 1 4 18.8Z"/>',
+  stack:    '<path d="m12 3.2 8.4 4.2-8.4 4.2-8.4-4.2Z"/><path d="m3.6 12 8.4 4.2 8.4-4.2M3.6 16.4l8.4 4.2 8.4-4.2"/>',
 };
 const icon = (name, cls="i")=>`<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${ICONS[name]||""}</svg>`;
 
@@ -490,6 +620,169 @@ const getTargets = ()=>({ ...DEFAULT_TARGETS, ...DB.get("targets", {}) });
 function foodTotals(list){
   return (list||[]).reduce((a,f)=>({calories:a.calories+(+f.calories||0),protein:a.protein+(+f.protein||0),carbs:a.carbs+(+f.carbs||0),fat:a.fat+(+f.fat||0)}),{calories:0,protein:0,carbs:0,fat:0});
 }
+
+// ============================================================================
+// FOOD DOMAIN
+//
+// The point of this model is that you enter a food's nutrition ONCE. After
+// that it lives in your history and in My Foods, and logging it again is a
+// tap plus a serving count — which is the whole reason a food tracker is
+// usable day to day.
+//
+// A "food" holds nutrition for ONE serving:
+//   { id, name, brand, serving:"1 pouch", per:{calories, protein, ...} }
+// A log entry is a food scaled by a serving count. It keeps calories/protein/
+// carbs/fat at the top level already scaled, which is exactly the shape the
+// old entries had — so foodTotals(), the rings and the coach all keep working
+// on days logged before any of this existed.
+// ============================================================================
+
+// One definition drives both the "create a food" form and the Nutrition Facts
+// panel, so the two can never drift apart. `main` = bold row, `sub` = indented
+// under the row above it (the label layout on a nutrition panel).
+const NUTRIENTS = [
+  {k:"calories",     label:"Calories",            unit:"",   main:true},
+  {k:"fat",          label:"Total Fat",           unit:"g",  main:true},
+  {k:"satFat",       label:"Saturated",           unit:"g",  sub:true},
+  {k:"transFat",     label:"Trans",               unit:"g",  sub:true},
+  {k:"polyFat",      label:"Polyunsaturated",     unit:"g",  sub:true},
+  {k:"monoFat",      label:"Monounsaturated",     unit:"g",  sub:true},
+  {k:"cholesterol",  label:"Cholesterol",         unit:"mg"},
+  {k:"sodium",       label:"Sodium",              unit:"mg"},
+  {k:"carbs",        label:"Total Carbohydrates", unit:"g",  main:true},
+  {k:"fiber",        label:"Dietary Fiber",       unit:"g",  sub:true},
+  {k:"sugar",        label:"Sugar",               unit:"g",  sub:true},
+  {k:"addedSugar",   label:"Added Sugars",        unit:"g",  sub:true},
+  {k:"sugarAlcohol", label:"Sugar Alcohols",      unit:"g",  sub:true},
+  {k:"protein",      label:"Protein",             unit:"g",  main:true},
+  {k:"vitaminD",     label:"Vitamin D",           unit:"%"},
+  {k:"calcium",      label:"Calcium",             unit:"%"},
+  {k:"iron",         label:"Iron",                unit:"%"},
+  {k:"potassium",    label:"Potassium",           unit:"mg"},
+  {k:"vitaminA",     label:"Vitamin A",           unit:"%"},
+  {k:"vitaminC",     label:"Vitamin C",           unit:"%"},
+];
+const MACROS = [["carbs","Carbs","--mac-carbs"],["fat","Fat","--mac-fat"],["protein","Protein","--mac-protein"]];
+const MEALS = ["Breakfast","Lunch","Dinner","Snacks"];
+
+const getMyFoods   = ()=>DB.get("myFoods",[]);
+const getMyMeals   = ()=>DB.get("myMeals",[]);
+const getMyRecipes = ()=>DB.get("myRecipes",[]);
+
+/** Scale one serving's nutrition by a serving count. */
+function scaleNutrition(per, servings){
+  const out={}; const n=+servings||0;
+  NUTRIENTS.forEach(x=>{ const v=per?.[x.k]; if(v!=null && v!=="") out[x.k]=+v*n; });
+  return out;
+}
+/** Sum nutrition across log entries — used for the day's Nutrition Facts. */
+function sumNutrition(list){
+  const out={};
+  (list||[]).forEach(e=>{
+    const n = e.nutrition || {calories:e.calories, protein:e.protein, carbs:e.carbs, fat:e.fat};
+    NUTRIENTS.forEach(x=>{ const v=n[x.k]; if(v!=null) out[x.k]=(out[x.k]||0)+(+v||0); });
+  });
+  return out;
+}
+/** Net carbs is derived, never stored — total carbs less fibre and polyols. */
+const netCarbs = n => n.carbs==null ? null : Math.max(0, (+n.carbs||0)-(+n.fiber||0)-(+n.sugarAlcohol||0));
+
+/**
+ * Each macro's share of the calories, which is what a macro ring actually
+ * shows: 85g carbs / 8g fat / 8g protein reads 77 / 16 / 7, not 84 / 8 / 8.
+ */
+function macroSplit(n){
+  const cal={carbs:(+n.carbs||0)*4, fat:(+n.fat||0)*9, protein:(+n.protein||0)*4};
+  const total=cal.carbs+cal.fat+cal.protein;
+  const pct=k=>total?Math.round(cal[k]/total*100):0;
+  return {total, carbs:pct("carbs"), fat:pct("fat"), protein:pct("protein")};
+}
+
+/** Round for display: whole numbers, but keep one decimal under 10. */
+const nfmt = v => v==null||v==="" ? null : (Math.abs(v)>=10||Number.isInteger(+v) ? String(Math.round(v)) : (+v).toFixed(1));
+
+/** A log entry's one-line summary: "440 cal, 1 pouch, Seeds of Change". */
+function foodSummary(f){
+  return [Math.round(+f.calories||0)+" cal", f.serving, f.brand].filter(Boolean).join(", ");
+}
+
+// Every food ever logged, most recent first, de-duplicated by name+brand —
+// the "History" tab, and the reason you rarely have to type anything twice.
+function foodHistory(){
+  const log=DB.get("foodLog",{}); const out=[]; const seen=new Set();
+  Object.keys(log).sort().reverse().forEach(day=>{
+    (log[day]||[]).forEach(e=>{
+      const key=(e.name||"").toLowerCase()+"|"+(e.brand||"").toLowerCase();
+      if(seen.has(key)) return;
+      seen.add(key);
+      // Store back at one serving so re-logging starts from a clean unit.
+      const servings=+e.servings||1;
+      const per = e.nutrition ? scaleNutrition(e.nutrition, 1/servings)
+                              : {calories:(+e.calories||0)/servings, protein:(+e.protein||0)/servings,
+                                 carbs:(+e.carbs||0)/servings, fat:(+e.fat||0)/servings};
+      out.push({id:"h-"+key, name:e.name, brand:e.brand||"", serving:e.serving||"1 serving", per, lastDay:day});
+    });
+  });
+  return out;
+}
+
+// A small set of single-ingredient staples so the first search is not empty.
+// These are standard reference values per the serving shown, NOT a branded
+// database — check them against your own label, and edit after logging if
+// your product differs. Anything you log becomes a history entry you own.
+const BASIC_FOODS = [
+  ["Chicken breast, cooked","4 oz",187,35,0,4],
+  ["Ground beef, 93/7, cooked","4 oz",195,29,0,10],
+  ["Ground turkey, 93/7, cooked","4 oz",213,27,0,11],
+  ["Sirloin steak, cooked","4 oz",228,34,0,9],
+  ["Salmon, cooked","4 oz",233,25,0,14],
+  ["Tuna, canned in water","3 oz",99,22,0,0.7],
+  ["Shrimp, cooked","4 oz",112,24,1.4,0.6],
+  ["Egg, large","1 egg",72,6.3,0.4,4.8],
+  ["Egg white, large","1 white",17,3.6,0.2,0.1],
+  ["Whey protein","1 scoop (30g)",120,24,3,1.5],
+  ["Greek yogurt, plain nonfat","1 cup",133,23,9,0.7],
+  ["Cottage cheese, 2%","1 cup",183,24,9,5],
+  ["Milk, whole","1 cup",149,7.7,12,8],
+  ["Milk, skim","1 cup",83,8.3,12,0.2],
+  ["Cheddar cheese","1 oz",114,7,0.4,9.4],
+  ["White rice, cooked","1 cup",205,4.3,45,0.4],
+  ["Brown rice, cooked","1 cup",218,5,46,1.6],
+  ["Quinoa, cooked","1 cup",222,8,39,3.6],
+  ["Pasta, cooked","1 cup",220,8,43,1.3],
+  ["Rolled oats, dry","1/2 cup (40g)",150,5,27,3],
+  ["Bread, whole wheat","1 slice",81,4,14,1.1],
+  ["Tortilla, flour 8in","1 tortilla",144,4,24,3.5],
+  ["Potato, baked with skin","1 medium",161,4.3,37,0.2],
+  ["Sweet potato, baked","1 medium",103,2.3,24,0.2],
+  ["Black beans, cooked","1 cup",227,15,41,0.9],
+  ["Broccoli, cooked","1 cup",55,3.7,11,0.6],
+  ["Spinach, raw","1 cup",7,0.9,1.1,0.1],
+  ["Avocado","1/2 medium",114,1.3,6,10.5],
+  ["Banana","1 medium",105,1.3,27,0.4],
+  ["Apple","1 medium",95,0.5,25,0.3],
+  ["Blueberries","1 cup",84,1.1,21,0.5],
+  ["Orange juice","1 cup",112,1.7,26,0.5],
+  ["Peanut butter","2 tbsp",190,7,7,16],
+  ["Almonds","1 oz",164,6,6,14],
+  ["Olive oil","1 tbsp",119,0,0,13.5],
+  ["Butter","1 tbsp",102,0.1,0,11.5],
+  ["Honey","1 tbsp",64,0,17,0],
+].map(([name,serving,calories,protein,carbs,fat],i)=>({
+  id:"b"+i, name, serving, brand:"Basics", basic:true,
+  per:{calories,protein,carbs,fat},
+}));
+
+// ---- Water ----
+// Stored in fluid ounces whatever unit is displayed, so switching units never
+// rewrites history.
+const WATER_UNITS = {oz:{label:"fl oz",per:1}, ml:{label:"ml",per:0.033814}, cup:{label:"cups",per:8}};
+const getWaterUnit  = ()=>WATER_UNITS[DB.get("waterUnit","oz")] ? DB.get("waterUnit","oz") : "oz";
+const getWaterGoal  = ()=>DB.get("waterGoal",96);            // fl oz
+const getWater      = ()=>DB.get("water",{});
+const waterToday    = ()=>+getWater()[todayKey()]||0;
+function addWater(oz){ const w=getWater(); const k=todayKey(); w[k]=Math.max(0,(+w[k]||0)+oz); DB.set("water",w); }
+const getWaterPresets = ()=>DB.get("waterPresets",[8,17,40]);
 
 // ============================================================================
 // FITNESS DOMAIN — ported from the LiftCoach logic, plain functions.
@@ -722,7 +1015,7 @@ const OB = (()=>{
     for(const ch of chunks){ const p=parseNote(ch,null); if(!p.date) continue; if(!p.weight&&!p.lifts.length&&!p.foods.length) continue; days.push(p); }
     days.sort((a,b)=>a.date.localeCompare(b.date)); return days;
   }
-  return {parseVault};
+  return {parseVault, parseFood};
 })();
 
 // ============================================================================
@@ -1034,36 +1327,155 @@ function renderFitness(){
   $("#f-weight").onclick=openWeight;
 }
 
-// ---- FOOD ----
+// ============================================================================
+// FOOD VIEW
+// ============================================================================
 function renderFood(){
-  const day=todayKey(); const log=DB.get("foodLog",{}); const foods=log[day]||[]; const totals=foodTotals(foods); const t=getTargets();
-  const MAC=[["calories","Calories",""],["protein","Protein","g"],["carbs","Carbs","g"],["fat","Fat","g"]];
+  const day=todayKey(); const log=DB.get("foodLog",{}); const foods=log[day]||[];
+  const totals=foodTotals(foods); const t=getTargets();
+  const dayNutrition=sumNutrition(foods);
+
+  // Group the day by meal. Entries logged before meals existed have no meal,
+  // so they get their own group rather than being silently filed under one.
+  const groups=MEALS.map(m=>({name:m, items:foods.map((f,i)=>({f,i})).filter(x=>x.f.meal===m)}));
+  const loose=foods.map((f,i)=>({f,i})).filter(x=>!MEALS.includes(x.f.meal));
+  if(loose.length) groups.push({name:"Uncategorised", items:loose, loose:true});
+
+  const w=waterToday(), wGoal=getWaterGoal(), unit=getWaterUnit(), u=WATER_UNITS[unit];
+  const inUnit=v=>{ const n=v/u.per; return n>=100?Math.round(n):+n.toFixed(n<10?1:0); };
+
   $("#view-food").innerHTML = `
     <div class="grid cols-2">
       <div class="panel">
         <div class="section-title"><h2>Today</h2><button class="primary" id="food-add">Add food</button></div>
-        ${MAC.map(m=>{ const v=Math.round(totals[m[0]]); const tg=t[m[0]]; const left=Math.round(tg-totals[m[0]]);
-          return `<div class="list-metric"><span class="k">${m[1]}</span><span>${v} / ${tg}${m[2]} <span class="${left<0?'':'muted'}" style="${left<0?'color:var(--warn)':''}">· ${left<0?Math.abs(left)+m[2]+" over":left+m[2]+" left"}</span></span></div>`; }).join("")}
-        <div class="row" style="margin-top:14px;gap:10px">
+        <div class="macro-row">
+          ${donut(totals)}
+          <div class="macro-legend">
+            ${MACROS.map(([k,label,tok])=>{ const sp=macroSplit(totals);
+              return `<div><div class="pct" style="color:var(${tok})">${sp[k]}%</div>
+                <div class="g">${nfmt(totals[k])||0} g</div><div class="n">${label}</div></div>`; }).join("")}
+          </div>
+        </div>
+        <p class="muted" style="margin:16px 0 0">
+          ${totals.calories<=t.calories
+            ? `${Math.round(t.calories-totals.calories).toLocaleString()} calories left of ${t.calories.toLocaleString()}.`
+            : `${Math.round(totals.calories-t.calories).toLocaleString()} calories over ${t.calories.toLocaleString()}.`}
+        </p>
+        <div class="row" style="margin-top:14px;gap:14px;flex-wrap:wrap">
           <button class="btn" id="food-obsidian">Import Obsidian</button>
           <button class="ghost" id="food-targets">Edit targets</button>
         </div>
       </div>
+
       <div class="panel">
-        <div class="section-title"><h2>Rings</h2></div>
-        <div class="rings">${ring(totals.calories,t.calories,"KCAL","")}${ring(totals.protein,t.protein,"PROTEIN","g")}</div>
+        <div class="section-title"><h2>Percent of daily goals</h2></div>
+        ${goalBars(totals,t)}
+        <div class="section-title" style="margin:24px 0 12px"><h2>Water</h2><button class="ghost" id="water-settings">Goal &amp; unit</button></div>
+        <div class="row" style="gap:18px;flex-wrap:wrap">
+          ${ring(inUnit(w), inUnit(wGoal), "WATER", " "+u.label)}
+          <div style="flex:1;min-width:150px">
+            <div class="presets">
+              ${getWaterPresets().map(oz=>`<button class="btn" data-water="${oz}">+${inUnit(oz)}</button>`).join("")}
+            </div>
+            <button class="ghost" id="water-custom" style="margin-top:10px">Enter an amount</button>
+            ${w>0?`<button class="ghost" id="water-undo" style="margin-left:14px">Undo</button>`:""}
+          </div>
+        </div>
       </div>
     </div>
+
     <div class="panel">
-      <div class="section-title"><h2>Logged today</h2></div>
-      <div>${foods.length ? foods.map((f,i)=>`<div class="entry"><div class="body"><strong>${esc(f.name)}</strong>
-        <small>${Math.round(f.calories)} cal · ${Math.round(f.protein)}p ${Math.round(f.carbs)}c ${Math.round(f.fat)}f</small></div>
-        <button type="button" class="del" data-food="${i}" aria-label="Remove ${esc(f.name)}">${icon("x")}</button></div>`).join("") : `<p class="empty">Nothing logged today.</p>`}</div>
+      <div class="section-title"><h2>Today's meals</h2><span class="tag">${foods.length} ITEM${foods.length===1?"":"S"}</span></div>
+      ${groups.map(g=>{
+        const kcal=Math.round(g.items.reduce((a,x)=>a+(+x.f.calories||0),0));
+        return `<div class="meal-head">
+            <h3>${esc(g.name)}</h3>
+            <span class="row" style="gap:14px">
+              <span class="meal-kcal">${kcal.toLocaleString()} CAL</span>
+              ${g.loose?"":`<button class="ghost" data-addmeal="${esc(g.name)}">Add</button>`}
+            </span>
+          </div>
+          ${g.items.length ? g.items.map(({f,i})=>`
+            <div class="entry">
+              <div class="body">
+                <strong>${esc(f.name)}${f.verified?`<span class="badge">${icon("verified")}</span>`:""}</strong>
+                <small>${esc(foodSummary(f))}</small>
+              </div>
+              <button type="button" class="del" data-edit="${i}" aria-label="Edit ${esc(f.name)}">${icon("edit")}</button>
+              <button type="button" class="del" data-food="${i}" aria-label="Remove ${esc(f.name)}">${icon("x")}</button>
+            </div>`).join("")
+          : `<p class="empty" style="padding:6px 0">Nothing logged.</p>`}`;
+      }).join("")}
+    </div>
+
+    <div class="panel">
+      <div class="section-title"><h2>Nutrition facts — today</h2>
+        <button class="ghost" id="nf-toggle" aria-expanded="${DB.get("nfOpen",false)}" aria-controls="nf-body">
+          ${DB.get("nfOpen",false)?"Hide":"Show"}</button></div>
+      <div id="nf-body" ${DB.get("nfOpen",false)?"":"hidden"}>${nutritionFacts(dayNutrition)}</div>
     </div>`;
-  $("#food-add").onclick=()=>openFood(false);
+
+  $("#food-add").onclick=()=>openBrowse();
   $("#food-obsidian").onclick=openObsidian;
   $("#food-targets").onclick=openTargets;
-  $("#view-food").querySelectorAll("[data-food]").forEach(b=>b.onclick=()=>{ const log=DB.get("foodLog",{}); const day=todayKey(); (log[day]||[]).splice(+b.dataset.food,1); DB.set("foodLog",log); renderFood(); if(current==="Command")renderCommand(); });
+  $("#water-settings").onclick=openWaterSettings;
+  $("#water-custom").onclick=openWater;
+  const undo=$("#water-undo"); if(undo) undo.onclick=()=>{ const wt=getWater(); delete wt[todayKey()]; DB.set("water",wt); renderFood(); toast("Water cleared"); };
+  $("#nf-toggle").onclick=()=>{ DB.set("nfOpen",!DB.get("nfOpen",false)); renderFood(); };
+  $("#view-food").querySelectorAll("[data-water]").forEach(b=>b.onclick=()=>{ addWater(+b.dataset.water); renderFood(); });
+  $("#view-food").querySelectorAll("[data-addmeal]").forEach(b=>b.onclick=()=>openBrowse(b.dataset.addmeal));
+  $("#view-food").querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>openLoggedEntry(+b.dataset.edit));
+  $("#view-food").querySelectorAll("[data-food]").forEach(b=>b.onclick=()=>{
+    const l=DB.get("foodLog",{}); (l[todayKey()]||[]).splice(+b.dataset.food,1); DB.set("foodLog",l);
+    renderFood(); toast("Removed"); });
+}
+
+/** Macro ring: three arcs sized by each macro's share of the calories. */
+function donut(n){
+  const sp=macroSplit(n); let off=0;
+  const arc=([k,,tok])=>{ const pct=sp[k]; if(!pct) return "";
+    const seg=`<circle cx="75" cy="75" r="60" pathLength="100" fill="none" stroke="var(${tok})"
+      stroke-width="13" stroke-dasharray="${pct} ${100-pct}" stroke-dashoffset="${-off}"/>`;
+    off+=pct; return seg; };
+  const arcs=MACROS.map(arc).join("");
+  return `<div class="donut" role="img" aria-label="${Math.round(+n.calories||0)} calories: ${sp.carbs}% carbs, ${sp.fat}% fat, ${sp.protein}% protein">
+    <svg viewBox="0 0 150 150" aria-hidden="true" focusable="false">
+      <circle cx="75" cy="75" r="60" fill="none" stroke="rgba(155,92,255,.14)" stroke-width="13"/>
+      <g transform="rotate(-90 75 75)">${arcs}</g>
+    </svg>
+    <div class="mid" aria-hidden="true"><b>${Math.round(+n.calories||0).toLocaleString()}</b><small>CAL</small></div>
+  </div>`;
+}
+
+/** Four slim percent-of-target bars: calories and each macro. */
+function goalBars(totals, t){
+  const rows=[["calories","Calories",""],["carbs","Carbs","g"],["fat","Fat","g"],["protein","Protein","g"]];
+  return `<div class="goalbars">${rows.map(([k,label,unit])=>{
+    const target=+t[k]||0, val=+totals[k]||0;
+    const pct=target?Math.round(val/target*100):0;
+    return `<div>
+      <div class="track"><div class="fill${pct>100?" over":""}" style="width:${Math.min(100,pct)}%"></div></div>
+      <div class="p">${pct}%</div>
+      <div class="n">${label}<br/>${Math.round(val).toLocaleString()}${unit} / ${target.toLocaleString()}${unit}</div>
+    </div>`; }).join("")}</div>`;
+}
+
+/**
+ * The nutrition panel. Only prints a row when there is a real number for it —
+ * an unknown nutrient shows "–" rather than a made-up zero.
+ */
+function nutritionFacts(n){
+  const rows=NUTRIENTS.map(x=>{
+    const v=n[x.k];
+    const val=(v==null||v==="") ? "–" : nfmt(v)+(x.unit?" "+x.unit:"");
+    let html=`<div class="nf${x.main?" main":""}${x.sub?" sub":""}"><span>${esc(x.label)}</span><span class="v">${val}</span></div>`;
+    if(x.k==="sugarAlcohol"){
+      const nc=netCarbs(n);
+      html+=`<div class="nf sub"><span>Net Carbs</span><span class="v">${nc==null?"–":nfmt(nc)+" g"}</span></div>`;
+    }
+    return html;
+  }).join("");
+  return rows;
 }
 
 // ---- STEPS ----
@@ -1186,7 +1598,14 @@ function renderGeneric(name){
 // doesn't dump you at the top of the document. <dialog>.showModal() already
 // traps focus and closes on Escape.
 let lastFocus=null;
-function openDialog(d){ lastFocus=document.activeElement; d.showModal(); }
+function openDialog(d){
+  lastFocus=document.activeElement;
+  // openScanNotice relabels this button; reset it so the next dialog to reuse
+  // the shared entry form doesn't inherit the wrong verb.
+  const save=$("#entry-dialog").querySelector('button[type="submit"]');
+  if(save) save.textContent="Save";
+  d.showModal();
+}
 document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>b.closest("dialog").close());
 document.querySelectorAll("dialog").forEach(d=>d.addEventListener("close",()=>{
   try{ lastFocus?.focus?.(); }catch(e){}
@@ -1207,20 +1626,524 @@ function openEntry(module){
   openDialog($("#entry-dialog")); setTimeout(()=>$("#ef-title")?.focus(),40);
 }
 
-// Food capture
-function openFood(scan){
-  $("#entry-title").textContent = scan?"Scan food":"Add food";
-  $("#entry-fields").innerHTML =
-    (scan?`<p class="muted" style="font-size:13px;margin:6px 0 0">Barcode scanning isn't wired up in this build — enter it manually and it logs the same way.</p>`:"")+
-    `<label>Food</label><input id="ff-name"/>
-     <label>Calories</label><input id="ff-cal" inputmode="numeric"/>
-     <div class="row" style="gap:10px"><div style="flex:1"><label>Protein (g)</label><input id="ff-p" inputmode="numeric"/></div>
-     <div style="flex:1"><label>Carbs (g)</label><input id="ff-c" inputmode="numeric"/></div>
-     <div style="flex:1"><label>Fat (g)</label><input id="ff-f" inputmode="numeric"/></div></div>`;
-  $("#entry-form").onsubmit=e=>{ e.preventDefault(); const name=$("#ff-name").value.trim(); const cal=parseFloat($("#ff-cal").value); if(!name||isNaN(cal))return;
-    const log=DB.get("foodLog",{}); const day=todayKey(); (log[day]=log[day]||[]).unshift({name,calories:cal,protein:+$("#ff-p").value||0,carbs:+$("#ff-c").value||0,fat:+$("#ff-f").value||0});
-    DB.set("foodLog",log); $("#entry-dialog").close(); toast("Food logged"); renderFood(); };
-  openDialog($("#entry-dialog")); setTimeout(()=>$("#ff-name").focus(),40);
+// ============================================================================
+// FOOD CAPTURE
+//
+// One browser dialog over five sources (History, My Meals, My Recipes, My
+// Foods, Basics), and one detail dialog that scales a saved food by a serving
+// count. Typing a food's nutrition is a once-per-food job; after that it is
+// two taps.
+// ============================================================================
+const BROWSE_TABS = ["History","My Meals","My Recipes","My Foods","Basics"];
+let browseTab = BROWSE_TABS.includes(DB.get("foodTab","History")) ? DB.get("foodTab","History") : "History";
+let browseMeal = null;
+let browseSort = "recent";
+
+/** Total nutrition of a saved meal or recipe (all its items, as entered). */
+const itemsNutrition = m => sumNutrition((m.items||[]).map(it=>({nutrition:scaleNutrition(it.per, it.servings||1)})));
+/** A recipe's nutrition for ONE serving of it. */
+const recipePer = r => scaleNutrition(itemsNutrition(r), 1/Math.max(1, +r.servings||1));
+
+function browseSource(tab){
+  if(tab==="My Foods")   return getMyFoods().map(f=>({...f, kind:"food", verified:true}));
+  if(tab==="My Meals")   return getMyMeals().map(m=>({...m, kind:"meal"}));
+  if(tab==="My Recipes") return getMyRecipes().map(r=>({...r, kind:"recipe"}));
+  if(tab==="Basics")     return BASIC_FOODS.map(f=>({...f, kind:"food"}));
+  return foodHistory().map(f=>({...f, kind:"food"}));
+}
+
+/** One row's display text, whatever kind of thing it is. */
+function rowText(it){
+  if(it.kind==="meal"){
+    const n=itemsNutrition(it);
+    return {title:it.name, sub:`${Math.round(+n.calories||0)} cal, ${(it.items||[]).length} item${(it.items||[]).length===1?"":"s"}`};
+  }
+  if(it.kind==="recipe"){
+    const per=recipePer(it);
+    return {title:it.name, sub:`${Math.round(+per.calories||0)} cal per serving, makes ${it.servings}`};
+  }
+  return {title:it.name, sub:[Math.round(+it.per.calories||0)+" cal", it.serving, it.brand].filter(Boolean).join(", ")};
+}
+
+// The quick-capture row changes with the tab, the way the real app does.
+function captureButtons(){
+  if(browseTab==="My Foods")   return [["Create a food","plus",()=>openCreateFood()],["Quick add","bolt",openQuickAdd]];
+  if(browseTab==="My Meals")   return [["Create a meal","stack",openCreateMeal],["Quick add","bolt",openQuickAdd]];
+  if(browseTab==="My Recipes") return [["Create a recipe","book",openCreateRecipe],["Quick add","bolt",openQuickAdd]];
+  return [["Barcode scan","scan",()=>openScanNotice("Barcode scan")],["Voice log","mic",openVoiceLog],
+          ["Meal scan","camera",()=>openScanNotice("Meal scan")],["Quick add","bolt",openQuickAdd]];
+}
+
+/** Kept as the entry point the quick actions and the Food screen call. */
+function openFood(scan){ openBrowse(); if(scan) openScanNotice("Barcode scan"); }
+
+function openBrowse(meal){
+  browseMeal = meal || browseMeal || defaultMeal();
+  const sel=$("#browse-meal");
+  sel.innerHTML=MEALS.map(m=>`<option${m===browseMeal?" selected":""}>${esc(m)}</option>`).join("");
+  sel.onchange=()=>{ browseMeal=sel.value; };
+  $("#browse-search").value="";
+  $("#browse-search").oninput=paintBrowse;
+  paintBrowse();
+  openDialog($("#browse-dialog"));
+  setTimeout(()=>$("#browse-search").focus(),40);
+}
+
+/** Best guess at which meal you are logging, from the clock. */
+function defaultMeal(){
+  const h=new Date().getHours();
+  return h<10.5 ? "Breakfast" : h<15 ? "Lunch" : h<21 ? "Dinner" : "Snacks";
+}
+
+function paintBrowse(){
+  const q=$("#browse-search").value.trim().toLowerCase();
+  const tabs=$("#browse-tabs"); tabs.innerHTML="";
+  BROWSE_TABS.forEach(t=>{
+    const b=document.createElement("button"); b.type="button"; b.id="ft-"+t.replace(/\s/g,"");
+    b.setAttribute("role","tab"); b.setAttribute("aria-selected", String(t===browseTab));
+    b.tabIndex = t===browseTab ? 0 : -1;
+    b.textContent=t;
+    b.onclick=()=>{ browseTab=t; DB.set("foodTab",t); paintBrowse(); };
+    b.onkeydown=e=>{
+      const i=BROWSE_TABS.indexOf(t); let j=null;
+      if(e.key==="ArrowRight") j=(i+1)%BROWSE_TABS.length;
+      else if(e.key==="ArrowLeft") j=(i-1+BROWSE_TABS.length)%BROWSE_TABS.length;
+      else if(e.key==="Home") j=0; else if(e.key==="End") j=BROWSE_TABS.length-1;
+      if(j===null) return;
+      e.preventDefault(); browseTab=BROWSE_TABS[j]; DB.set("foodTab",browseTab); paintBrowse();
+      $("#ft-"+BROWSE_TABS[j].replace(/\s/g,"")).focus();
+    };
+    tabs.append(b);
+  });
+
+  const cap=$("#browse-capture"); cap.innerHTML="";
+  captureButtons().forEach(([label,ic,fn])=>{
+    const b=document.createElement("button"); b.type="button";
+    b.innerHTML=`${icon(ic)}<span>${esc(label)}</span>`; b.onclick=fn; cap.append(b);
+  });
+
+  // A search reaches across every source at once — that is the whole point of
+  // searching. Without one you are browsing the selected tab.
+  let items, heading;
+  if(q){
+    items=[].concat(...BROWSE_TABS.map(browseSource))
+      .filter(it=>((it.name||"")+" "+(it.brand||"")+" "+(it.serving||"")).toLowerCase().includes(q));
+    heading=`${items.length} match${items.length===1?"":"es"}`;
+  }else{
+    items=browseSource(browseTab);
+    heading=browseTab==="History" ? "Recently logged" : browseTab;
+  }
+  if(browseSort==="name") items=[...items].sort((a,b)=>(a.name||"").localeCompare(b.name||""));
+  $("#browse-listname").textContent=heading;
+  const sortBtn=$("#browse-sort");
+  sortBtn.textContent = browseSort==="name" ? "Sorted A–Z" : "Most recent";
+  sortBtn.onclick=()=>{ browseSort = browseSort==="name" ? "recent" : "name"; paintBrowse(); };
+
+  const note=$("#browse-note");
+  if(!q && browseTab==="Basics"){
+    note.hidden=false;
+    note.textContent="Standard reference values for a plain serving, not a branded database. Check them against your own label — once you log one you can edit the entry, and it becomes yours in History.";
+  }else if(!q && browseTab==="History" && !items.length){
+    note.hidden=false;
+    note.textContent="Nothing logged yet. Create a food from its label, or start from the Basics tab.";
+  }else note.hidden=true;
+
+  const box=$("#browse-list");
+  box.setAttribute("aria-labelledby","ft-"+browseTab.replace(/\s/g,""));
+  box.innerHTML="";
+  if(!items.length){ box.innerHTML=`<p class="empty">Nothing here yet.</p>`; return; }
+  items.forEach(it=>{
+    const {title,sub}=rowText(it);
+    const row=document.createElement("div"); row.className="pick";
+    const open=document.createElement("button");
+    open.type="button"; open.className="open";
+    open.innerHTML=`<span class="body"><strong>${esc(title)}${it.verified?`<span class="badge" title="Entered by you from a label">${icon("verified")}</span>`:""}</strong><small>${esc(sub)}</small></span>`;
+    open.onclick=()=>openItem(it);
+    row.append(open);
+    // The + logs one serving straight away, the way the real app's + does.
+    const add=document.createElement("button");
+    add.type="button"; add.className="add"; add.setAttribute("aria-label","Log "+title+" now");
+    add.innerHTML=icon("plus"); add.style.margin="0 12px 0 0";
+    add.onclick=()=>{ logItem(it,1); };
+    row.append(add);
+    if(it.kind==="meal"||it.kind==="recipe"||(browseTab==="My Foods"&&!q)){
+      const del=document.createElement("button");
+      del.type="button"; del.className="del"; del.style.margin="0 10px 0 0";
+      del.setAttribute("aria-label","Delete "+title); del.innerHTML=icon("x");
+      del.onclick=()=>{
+        const key=it.kind==="meal"?"myMeals":it.kind==="recipe"?"myRecipes":"myFoods";
+        DB.set(key, DB.get(key,[]).filter(x=>x.id!==it.id)); paintBrowse(); toast("Deleted");
+      };
+      row.append(del);
+    }
+    box.append(row);
+  });
+}
+
+/** Opening a row: foods and recipes get the detail screen, meals just log. */
+function openItem(it){
+  if(it.kind==="meal"){ logItem(it,1); return; }
+  if(it.kind==="recipe"){
+    openDetail({name:it.name, brand:"Recipe", serving:"1 serving", per:recipePer(it)});
+    return;
+  }
+  openDetail(it);
+}
+
+/** Log without opening the detail screen — the + button and saved meals. */
+function logItem(it, servings){
+  const day=todayKey(); const log=DB.get("foodLog",{}); const list=(log[day]=log[day]||[]);
+  if(it.kind==="meal"){
+    (it.items||[]).forEach(x=>list.unshift(entryFrom({name:x.name, brand:x.brand, serving:x.serving, per:x.per}, x.servings||1, browseMeal)));
+    DB.set("foodLog",log); toast(`${it.name} logged`);
+  }else{
+    const per = it.kind==="recipe" ? recipePer(it) : it.per;
+    list.unshift(entryFrom({...it, per}, servings, browseMeal));
+    DB.set("foodLog",log); toast(`${it.name} logged`);
+  }
+  refreshFood();
+}
+
+/** Build a log entry. Macros stay at the top level, already scaled, so every
+ *  older reader of foodLog (totals, rings, coach) keeps working untouched. */
+function entryFrom(food, servings, meal, time){
+  const n=scaleNutrition(food.per, servings);
+  return {
+    id:uid(), name:food.name, brand:food.brand||"", serving:food.serving||"1 serving",
+    servings:+servings||1, meal:meal||defaultMeal(),
+    time: time || new Date().toTimeString().slice(0,5),
+    calories:+n.calories||0, protein:+n.protein||0, carbs:+n.carbs||0, fat:+n.fat||0,
+    nutrition:n, verified:!!food.verified,
+  };
+}
+
+function refreshFood(){ if(current==="Food") renderFood(); else if(current==="Command") renderCommand(); }
+
+// ---- Detail: servings, macros, percent of goals, nutrition facts ----
+let detailState=null, detailNfOpen=false;
+
+function openDetail(food, opts={}){
+  detailState={
+    food, servings:opts.servings ?? 1, meal:opts.meal || browseMeal || defaultMeal(),
+    time:opts.time || new Date().toTimeString().slice(0,5),
+    serving:food.serving || "1 serving", editIndex: opts.editIndex ?? null,
+  };
+  $("#detail-title").textContent=food.name;
+  $("#detail-brand").textContent=[food.brand, opts.editIndex!=null?"Editing a logged entry":""].filter(Boolean).join(" · ");
+  $("#detail-log").textContent = opts.editIndex!=null ? "Save changes" : "Log it";
+  $("#detail-body").innerHTML=`
+    <div class="fieldrow"><span><label for="d-serving" style="margin:0">Serving Size</label></span>
+      <input id="d-serving" value="${esc(detailState.serving)}" /></div>
+    <div class="fieldrow"><span><label for="d-servings" style="margin:0">Number of Servings</label></span>
+      <input id="d-servings" inputmode="decimal" value="${esc(String(detailState.servings))}" /></div>
+    <div class="fieldrow"><span><label for="d-time" style="margin:0">Time</label></span>
+      <input id="d-time" type="time" value="${esc(detailState.time)}" /></div>
+    <div class="fieldrow"><span><label for="d-meal" style="margin:0">Meal</label></span>
+      <select id="d-meal">${MEALS.map(m=>`<option${m===detailState.meal?" selected":""}>${esc(m)}</option>`).join("")}</select></div>
+    <div id="d-dyn"></div>`;
+  paintDetail();
+
+  $("#d-servings").oninput=()=>{ detailState.servings=parseFloat($("#d-servings").value); paintDetail(); };
+  $("#d-serving").oninput=()=>{ detailState.serving=$("#d-serving").value; };
+  $("#d-time").oninput=()=>{ detailState.time=$("#d-time").value; };
+  $("#d-meal").onchange=()=>{ detailState.meal=$("#d-meal").value; };
+
+  $("#detail-form").onsubmit=e=>{
+    e.preventDefault();
+    const n=parseFloat($("#d-servings").value);
+    if(!isFinite(n)||n<=0){ $("#d-servings").focus(); return; }
+    const entry=entryFrom({...detailState.food, serving:detailState.serving}, n, detailState.meal, detailState.time);
+    const day=todayKey(); const log=DB.get("foodLog",{}); const list=(log[day]=log[day]||[]);
+    if(detailState.editIndex!=null) list[detailState.editIndex]=entry; else list.unshift(entry);
+    DB.set("foodLog",log);
+    $("#detail-dialog").close();
+    if($("#browse-dialog").open) $("#browse-dialog").close();
+    toast(detailState.editIndex!=null?"Entry updated":"Food logged");
+    refreshFood();
+  };
+  openDialog($("#detail-dialog"));
+  setTimeout(()=>$("#d-servings").select(),40);
+}
+
+/** Re-renders only the computed half, so the caret stays where you are typing. */
+function paintDetail(){
+  const servings=isFinite(detailState.servings)&&detailState.servings>0 ? detailState.servings : 0;
+  const n=scaleNutrition(detailState.food.per, servings);
+  const sp=macroSplit(n);
+  $("#d-dyn").innerHTML=`
+    <div class="macro-row" style="margin:20px 0 6px">
+      ${donut(n)}
+      <div class="macro-legend">
+        ${MACROS.map(([k,label,tok])=>`<div><div class="pct" style="color:var(${tok})">${sp[k]}%</div>
+          <div class="g">${nfmt(n[k])||0} g</div><div class="n">${label}</div></div>`).join("")}
+      </div>
+    </div>
+    <div class="section-title" style="margin:22px 0 12px"><h2>Percent of daily goals</h2></div>
+    ${goalBars(n,getTargets())}
+    <div class="section-title" style="margin:24px 0 4px"><h2>Nutrition facts</h2>
+      <button type="button" class="ghost" id="d-nf" aria-expanded="${detailNfOpen}" aria-controls="d-nf-body">${detailNfOpen?"Hide":"Show"}</button></div>
+    <div id="d-nf-body" ${detailNfOpen?"":"hidden"}>${nutritionFacts(n)}</div>`;
+  $("#d-nf").onclick=()=>{ detailNfOpen=!detailNfOpen; paintDetail(); };
+}
+
+/** Edit something already in today's log. */
+function openLoggedEntry(index){
+  const list=DB.get("foodLog",{})[todayKey()]||[]; const e=list[index]; if(!e) return;
+  const servings=+e.servings||1;
+  const per = e.nutrition ? scaleNutrition(e.nutrition, 1/servings)
+                          : {calories:(+e.calories||0)/servings, protein:(+e.protein||0)/servings,
+                             carbs:(+e.carbs||0)/servings, fat:(+e.fat||0)/servings};
+  openDetail({name:e.name, brand:e.brand||"", serving:e.serving||"1 serving", per, verified:e.verified},
+             {servings, meal:e.meal, time:e.time, editIndex:index});
+}
+
+// ---- Create a food: the full label, entered once ----
+function openCreateFood(prefill={}){
+  $("#entry-title").textContent="Create a food";
+  $("#entry-fields").innerHTML=`
+    <label for="cf-name">Name</label><input id="cf-name" value="${esc(prefill.name||"")}" placeholder="Cookie Butter Protein Bar"/>
+    <label for="cf-brand">Brand <span class="faint">(optional)</span></label><input id="cf-brand" value="${esc(prefill.brand||"")}" placeholder="Misfits"/>
+    <label for="cf-serving">Serving size</label><input id="cf-serving" value="${esc(prefill.serving||"1 serving")}" placeholder="1 bar"/>
+    <p class="note">Enter the label for ONE serving. Leave a field blank if the label doesn't list it — a blank stays blank rather than becoming a zero.</p>
+    ${NUTRIENTS.map(x=>`<label for="cf-${x.k}">${esc(x.label)}${x.unit?` (${x.unit})`:""}${x.sub?' <span class="faint">— part of the row above</span>':""}</label>
+      <input id="cf-${x.k}" inputmode="decimal" value="${prefill.per&&prefill.per[x.k]!=null?esc(String(prefill.per[x.k])):""}"/>`).join("")}`;
+  $("#entry-form").onsubmit=e=>{
+    e.preventDefault();
+    const name=$("#cf-name").value.trim();
+    const cal=parseFloat($("#cf-calories").value);
+    if(!name||!isFinite(cal)){ (!name?$("#cf-name"):$("#cf-calories")).focus(); return; }
+    const per={};
+    NUTRIENTS.forEach(x=>{ const raw=$("#cf-"+x.k).value.trim(); if(raw!==""){ const v=parseFloat(raw); if(isFinite(v)) per[x.k]=v; } });
+    const food={id:uid(), name, brand:$("#cf-brand").value.trim(), serving:$("#cf-serving").value.trim()||"1 serving", per, created:Date.now()};
+    const l=getMyFoods(); l.unshift(food); DB.set("myFoods",l);
+    $("#entry-dialog").close(); toast("Food saved");
+    if($("#browse-dialog").open){ browseTab="My Foods"; DB.set("foodTab","My Foods"); paintBrowse(); }
+    openDetail({...food, verified:true});
+  };
+  openDialog($("#entry-dialog")); setTimeout(()=>$("#cf-name").focus(),40);
+}
+
+// ---- Quick add: calories now, details never ----
+function openQuickAdd(){
+  $("#entry-title").textContent="Quick add";
+  $("#entry-fields").innerHTML=`
+    <p class="note" style="margin-top:12px">For when you know the calories and nothing else. Macros are optional.</p>
+    <label for="qa-name">What was it <span class="faint">(optional)</span></label><input id="qa-name" placeholder="Lunch out"/>
+    <label for="qa-cal">Calories</label><input id="qa-cal" inputmode="numeric"/>
+    <div class="row" style="gap:10px">
+      <div style="flex:1"><label for="qa-p">Protein (g)</label><input id="qa-p" inputmode="decimal"/></div>
+      <div style="flex:1"><label for="qa-c">Carbs (g)</label><input id="qa-c" inputmode="decimal"/></div>
+      <div style="flex:1"><label for="qa-f">Fat (g)</label><input id="qa-f" inputmode="decimal"/></div>
+    </div>
+    <label for="qa-meal">Meal</label>
+    <select id="qa-meal">${MEALS.map(m=>`<option${m===(browseMeal||defaultMeal())?" selected":""}>${esc(m)}</option>`).join("")}</select>`;
+  $("#entry-form").onsubmit=e=>{
+    e.preventDefault();
+    const cal=parseFloat($("#qa-cal").value); if(!isFinite(cal)){ $("#qa-cal").focus(); return; }
+    const per={calories:cal};
+    [["protein","#qa-p"],["carbs","#qa-c"],["fat","#qa-f"]].forEach(([k,sel])=>{
+      const v=parseFloat($(sel).value); if(isFinite(v)) per[k]=v; });
+    const day=todayKey(); const log=DB.get("foodLog",{}); const list=(log[day]=log[day]||[]);
+    list.unshift(entryFrom({name:$("#qa-name").value.trim()||"Quick add", serving:"1 serving", per}, 1, $("#qa-meal").value));
+    DB.set("foodLog",log);
+    $("#entry-dialog").close(); if($("#browse-dialog").open) $("#browse-dialog").close();
+    toast("Quick add logged"); refreshFood();
+  };
+  openDialog($("#entry-dialog")); setTimeout(()=>$("#qa-cal").focus(),40);
+}
+
+// ---- Voice log ----
+//
+// The browser's own SpeechRecognition, so there is no key and nothing leaves
+// the device on browsers that run it locally. Where it is unavailable the
+// dialog is still perfectly usable — the same box takes typing.
+function openVoiceLog(){
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  $("#entry-title").textContent="Voice log";
+  $("#entry-fields").innerHTML=`
+    <p class="note" style="margin-top:12px">Say or type it the way you'd write it: <code>chicken and rice 640 cal 52g protein 68g carbs 14g fat</code>. Calories are required; the rest are picked out if you mention them.</p>
+    <div class="row" style="margin-top:14px">
+      <button type="button" class="btn" id="vl-mic" ${SR?"":"disabled"}>${icon("mic")} <span id="vl-mic-label">${SR?"Start listening":"Speech not supported here"}</span></button>
+    </div>
+    <label for="vl-text">Heard</label><textarea id="vl-text" placeholder="chicken and rice 640 cal 52g protein"></textarea>
+    <div id="vl-preview"></div>
+    <label for="vl-meal">Meal</label>
+    <select id="vl-meal">${MEALS.map(m=>`<option${m===(browseMeal||defaultMeal())?" selected":""}>${esc(m)}</option>`).join("")}</select>`;
+  let rec=null;
+  if(SR){
+    $("#vl-mic").onclick=()=>{
+      if(rec){ rec.stop(); return; }
+      rec=new SR(); rec.lang="en-US"; rec.interimResults=true; rec.continuous=false;
+      $("#vl-mic-label").textContent="Listening… tap to stop";
+      rec.onresult=ev=>{
+        const text=[...ev.results].map(r=>r[0].transcript).join(" ");
+        $("#vl-text").value=text; previewVoice();
+      };
+      rec.onerror=ev=>{ $("#vl-mic-label").textContent = ev.error==="not-allowed"
+        ? "Microphone blocked — type it instead" : "Didn't catch that — try again"; rec=null; };
+      rec.onend=()=>{ if($("#vl-mic-label")) $("#vl-mic-label").textContent="Start listening"; rec=null; };
+      try{ rec.start(); }catch(e){ rec=null; }
+    };
+  }
+  const previewVoice=()=>{
+    const parsed=OB.parseFood($("#vl-text").value.trim());
+    $("#vl-preview").innerHTML = parsed
+      ? `<p class="note" style="border-left-color:var(--success)">Reads as <strong>${esc(parsed.name)}</strong> — ${Math.round(parsed.calories)} cal, ${parsed.protein}p ${parsed.carbs}c ${parsed.fat}f</p>`
+      : ($("#vl-text").value.trim() ? `<p class="note" style="border-left-color:var(--warn)">No calorie number found yet.</p>` : "");
+  };
+  $("#vl-text").oninput=previewVoice;
+  $("#entry-form").onsubmit=e=>{
+    e.preventDefault();
+    const parsed=OB.parseFood($("#vl-text").value.trim());
+    if(!parsed){ $("#vl-text").focus(); return; }
+    if(rec) try{ rec.stop(); }catch(err){}
+    const day=todayKey(); const log=DB.get("foodLog",{}); const list=(log[day]=log[day]||[]);
+    list.unshift(entryFrom({name:parsed.name, serving:"1 serving",
+      per:{calories:parsed.calories, protein:parsed.protein, carbs:parsed.carbs, fat:parsed.fat}}, 1, $("#vl-meal").value));
+    DB.set("foodLog",log);
+    $("#entry-dialog").close(); if($("#browse-dialog").open) $("#browse-dialog").close();
+    toast("Logged"); refreshFood();
+  };
+  openDialog($("#entry-dialog"));
+}
+
+// ---- Scanners ----
+//
+// A camera scan needs a food database to look the code up in, and this app has
+// no backend to hold one. Rather than fake a scan, it says so and hands you
+// the fastest real path: type the label once, then it is two taps forever.
+function openScanNotice(kind){
+  $("#entry-title").textContent=kind;
+  $("#entry-fields").innerHTML=`
+    <p class="note" style="margin-top:14px;border-left-color:var(--warn)">
+      ${esc(kind)} isn't wired up in this build. Reading a barcode or a photo only helps if there
+      is a food database behind it to look the result up in, and this dashboard runs entirely on
+      your device with no server and no account.
+    </p>
+    <p class="muted" style="font-size:13.5px;margin:14px 0 0">
+      The fastest real path: enter the label once with <strong>Create a food</strong>. After that it
+      is in My Foods and History, and logging it again is two taps.
+    </p>`;
+  $("#entry-form").onsubmit=e=>{ e.preventDefault(); $("#entry-dialog").close(); openCreateFood(); };
+  openDialog($("#entry-dialog"));
+  $("#entry-dialog").querySelector('button[type="submit"]').textContent="Create a food";
+}
+
+// ---- My Meals: name a set of today's entries and re-log it in one tap ----
+function openCreateMeal(){
+  const list=DB.get("foodLog",{})[todayKey()]||[];
+  $("#entry-title").textContent="Create a meal";
+  $("#entry-fields").innerHTML = list.length ? `
+    <p class="note" style="margin-top:12px">Pick what belongs in it from today's log. Logging the meal later adds every item at once.</p>
+    <label for="cm-name">Meal name</label><input id="cm-name" placeholder="Post-training plate"/>
+    <div style="margin-top:14px">${list.map((e,i)=>`
+      <label class="row" style="gap:10px;margin:0;padding:9px 0;border-top:1px solid var(--rim);font-size:14px;color:var(--text)">
+        <input type="checkbox" data-cm="${i}" style="width:auto;flex:none" />
+        <span>${esc(e.name)} <span class="muted">· ${esc(foodSummary(e))}</span></span>
+      </label>`).join("")}</div>`
+    : `<p class="note" style="margin-top:14px">Log the foods that make up the meal first, then come back and name the set.</p>`;
+  $("#entry-form").onsubmit=e=>{
+    e.preventDefault();
+    if(!list.length){ $("#entry-dialog").close(); return; }
+    const name=$("#cm-name").value.trim(); if(!name){ $("#cm-name").focus(); return; }
+    const picked=[...$("#entry-fields").querySelectorAll("[data-cm]")].filter(c=>c.checked).map(c=>list[+c.dataset.cm]);
+    if(!picked.length) return;
+    const items=picked.map(e=>{
+      const servings=+e.servings||1;
+      const per = e.nutrition ? scaleNutrition(e.nutrition, 1/servings)
+                              : {calories:(+e.calories||0)/servings, protein:(+e.protein||0)/servings,
+                                 carbs:(+e.carbs||0)/servings, fat:(+e.fat||0)/servings};
+      return {name:e.name, brand:e.brand||"", serving:e.serving||"1 serving", servings, per};
+    });
+    const l=getMyMeals(); l.unshift({id:uid(), name, items, created:Date.now()}); DB.set("myMeals",l);
+    $("#entry-dialog").close(); toast("Meal saved");
+    if($("#browse-dialog").open){ browseTab="My Meals"; DB.set("foodTab","My Meals"); paintBrowse(); }
+  };
+  openDialog($("#entry-dialog")); setTimeout(()=>$("#cm-name")?.focus(),40);
+}
+
+// ---- My Recipes: ingredients in, per-serving macros out ----
+function openCreateRecipe(){
+  $("#entry-title").textContent="Create a recipe";
+  $("#entry-fields").innerHTML=`
+    <label for="cr-name">Recipe name</label><input id="cr-name" placeholder="Chili"/>
+    <label for="cr-servings">Servings it makes</label><input id="cr-servings" inputmode="decimal" value="4"/>
+    <label for="cr-items">Ingredients — one per line</label>
+    <textarea id="cr-items" style="min-height:130px" placeholder="Ground turkey 481 cal, 54g protein, 0g carbs, 27g fat
+Black beans 227 cal, 15g protein, 41g carbs, 1g fat
+Olive oil 119 cal, 0g protein, 0g carbs, 13.5g fat"></textarea>
+    <p class="note">Each line needs a calorie number; protein, carbs and fat are picked out when you write them. The per-serving figures update as you type.</p>
+    <div id="cr-preview"></div>`;
+  const preview=()=>{
+    const lines=$("#cr-items").value.split(/\r?\n/).map(l=>OB.parseFood(l.trim())).filter(Boolean);
+    const servings=Math.max(1, parseFloat($("#cr-servings").value)||1);
+    if(!lines.length){ $("#cr-preview").innerHTML=""; return; }
+    const total=lines.reduce((a,f)=>({calories:a.calories+f.calories, protein:a.protein+f.protein,
+      carbs:a.carbs+f.carbs, fat:a.fat+f.fat}), {calories:0,protein:0,carbs:0,fat:0});
+    $("#cr-preview").innerHTML=`<p class="note" style="border-left-color:var(--success)">
+      ${lines.length} ingredient${lines.length===1?"":"s"} · per serving:
+      <strong>${Math.round(total.calories/servings)} cal</strong>,
+      ${nfmt(total.protein/servings)}p ${nfmt(total.carbs/servings)}c ${nfmt(total.fat/servings)}f</p>`;
+  };
+  $("#cr-items").oninput=preview; $("#cr-servings").oninput=preview;
+  $("#entry-form").onsubmit=e=>{
+    e.preventDefault();
+    const name=$("#cr-name").value.trim(); if(!name){ $("#cr-name").focus(); return; }
+    const servings=Math.max(1, parseFloat($("#cr-servings").value)||1);
+    const items=$("#cr-items").value.split(/\r?\n/).map(l=>OB.parseFood(l.trim())).filter(Boolean)
+      .map(f=>({name:f.name, serving:"1 serving", servings:1,
+                per:{calories:f.calories, protein:f.protein, carbs:f.carbs, fat:f.fat}}));
+    if(!items.length){ $("#cr-items").focus(); return; }
+    const l=getMyRecipes(); l.unshift({id:uid(), name, servings, items, created:Date.now()}); DB.set("myRecipes",l);
+    $("#entry-dialog").close(); toast("Recipe saved");
+    if($("#browse-dialog").open){ browseTab="My Recipes"; DB.set("foodTab","My Recipes"); paintBrowse(); }
+  };
+  openDialog($("#entry-dialog")); setTimeout(()=>$("#cr-name").focus(),40);
+}
+
+// ---- Water ----
+function openWater(){
+  const u=WATER_UNITS[getWaterUnit()];
+  $("#entry-title").textContent="Add water";
+  $("#entry-fields").innerHTML=`
+    <label for="wa-val">Amount (${esc(u.label)})</label><input id="wa-val" inputmode="decimal" placeholder="16"/>
+    <div class="presets">${getWaterPresets().map(oz=>`<button type="button" class="btn" data-wp="${oz}">+${+(oz/u.per).toFixed(oz/u.per<10?1:0)}</button>`).join("")}</div>`;
+  $("#entry-fields").querySelectorAll("[data-wp]").forEach(b=>b.onclick=()=>{
+    addWater(+b.dataset.wp); $("#entry-dialog").close(); toast("Water logged"); refreshFood(); });
+  $("#entry-form").onsubmit=e=>{
+    e.preventDefault(); const v=parseFloat($("#wa-val").value);
+    if(!isFinite(v)||v<=0) return;
+    addWater(v*u.per); $("#entry-dialog").close(); toast("Water logged"); refreshFood(); };
+  openDialog($("#entry-dialog")); setTimeout(()=>$("#wa-val").focus(),40);
+}
+
+function openWaterSettings(){
+  const unit=getWaterUnit(), u=WATER_UNITS[unit];
+  $("#entry-title").textContent="Water goal & unit";
+  $("#entry-fields").innerHTML=`
+    <label for="ws-unit">Unit</label>
+    <select id="ws-unit">${Object.keys(WATER_UNITS).map(k=>`<option value="${k}"${k===unit?" selected":""}>${esc(WATER_UNITS[k].label)}</option>`).join("")}</select>
+    <label for="ws-goal">Daily goal (<span id="ws-u">${esc(u.label)}</span>)</label>
+    <input id="ws-goal" inputmode="decimal" value="${+(getWaterGoal()/u.per).toFixed(getWaterGoal()/u.per<10?1:0)}"/>
+    <label for="ws-presets">Quick-add buttons</label>
+    <input id="ws-presets" value="${getWaterPresets().map(oz=>+(oz/u.per).toFixed(oz/u.per<10?1:0)).join(", ")}"/>
+    <p class="note">Up to three, comma separated. Everything is stored in fluid ounces underneath, so switching units never rewrites what you already logged.</p>`;
+  $("#ws-unit").onchange=()=>{
+    const nu=WATER_UNITS[$("#ws-unit").value];
+    $("#ws-u").textContent=nu.label;
+    $("#ws-goal").value=+(getWaterGoal()/nu.per).toFixed(getWaterGoal()/nu.per<10?1:0);
+    $("#ws-presets").value=getWaterPresets().map(oz=>+(oz/nu.per).toFixed(oz/nu.per<10?1:0)).join(", ");
+  };
+  $("#entry-form").onsubmit=e=>{
+    e.preventDefault();
+    const nu=WATER_UNITS[$("#ws-unit").value];
+    const goal=parseFloat($("#ws-goal").value);
+    if(isFinite(goal)&&goal>0) DB.set("waterGoal", goal*nu.per);
+    const presets=$("#ws-presets").value.split(",").map(x=>parseFloat(x)).filter(x=>isFinite(x)&&x>0).slice(0,3).map(x=>x*nu.per);
+    if(presets.length) DB.set("waterPresets", presets);
+    DB.set("waterUnit", $("#ws-unit").value);
+    $("#entry-dialog").close(); toast("Water settings saved"); refreshFood(); };
+  openDialog($("#entry-dialog"));
 }
 
 // Mat work capture

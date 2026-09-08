@@ -11,7 +11,14 @@ serves `index.html` at `/`). All data is stored locally in the browser under
 - **Fitness** — lifts + MMA / mat work, a repeating weekly plan, and a rules
   coach that cross-references training, food and rest. Includes an Obsidian
   importer (paste daily notes → weigh-ins, lifts, food).
-- **Food** — log meals, macros vs. editable targets.
+- **Food** — a full food log. Meals (Breakfast/Lunch/Dinner/Snacks), a macro
+  ring by calorie share, percent-of-goal bars, and the whole nutrition panel
+  (20 nutrients, indented sub-rows, derived Net Carbs). Sources: History, My
+  Meals, My Recipes, My Foods and a Basics set of reference staples, all
+  searchable at once. Enter a label once with **Create a food** and logging it
+  again is a tap plus a serving count. Also quick add, a voice log that uses
+  the browser's own speech recognition, and water with quick-add presets and a
+  unit switch.
 - **Steps** — daily goal ring, 7-day chart, and an Apple Shortcut recipe that
   pushes Health's step count in via `?steps=NNNN`.
 - **Planner / Calendar / Journal / Reselling / Money** — quick capture lists.

@@ -21,6 +21,10 @@ serves `index.html` at `/`). All data is stored locally in the browser under
   unit switch.
 - **Steps** — daily goal ring, 7-day chart, and an Apple Shortcut recipe that
   pushes Health's step count in via `?steps=NNNN`.
+
+Food and Steps carry a day strip: step back through the log to review or fix a
+day you missed, and everything you log there — food, water, steps — lands on
+the day you are looking at. Command and the coach always speak about today.
 - **Planner / Calendar / Journal / Reselling / Money** — quick capture lists.
 
 ## Obsidian

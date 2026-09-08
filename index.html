@@ -273,6 +273,17 @@
   .coach-good{border-left-color:var(--success);color:#a4e8cc}
   .coach-info{border-left-color:var(--rim-strong);color:var(--muted)}
 
+  /* ---- Day strip ---- */
+  .daynav{display:flex;align-items:center;gap:8px}
+  .daynav button[data-day="-1"],.daynav button[data-day="1"]{
+    display:flex;color:var(--muted);border:1px solid var(--rim);background:var(--s2);
+    padding:5px;border-radius:var(--radius-sm);transition:background var(--dur),color var(--dur),border-color var(--dur)}
+  .daynav button[data-day="-1"]:hover,.daynav button[data-day="1"]:hover{color:var(--lav);border-color:var(--rim-strong);background:var(--s3)}
+  .daynav button[disabled]{opacity:.35;cursor:default}
+  .daynav .i{width:16px;height:16px}
+  .daynav .d{font:11px ui-monospace,"Courier New",monospace;letter-spacing:1.4px;
+    color:var(--lav);text-transform:uppercase;min-width:96px;text-align:center}
+
   /* ---- Food ---- */
   .meal-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;
     padding:14px 0 8px;border-top:1px solid var(--rim)}
@@ -591,6 +602,8 @@ const ICONS = {
   bolt:     '<circle cx="10.5" cy="10.5" r="6"/><path d="m15 15 5 5M10.5 7.8v5.4M7.8 10.5h5.4"/>',
   water:    '<path d="M12 3.2s6 6.4 6 10.3a6 6 0 0 1-12 0c0-3.9 6-10.3 6-10.3Z"/>',
   chevron:  '<path d="m6 9.5 6 6 6-6"/>',
+  chevL:    '<path d="m14.5 6-6 6 6 6"/>',
+  chevR:    '<path d="m9.5 6 6 6-6 6"/>',
   edit:     '<path d="M4 20.2h4L19.6 8.6a2.7 2.7 0 0 0-3.8-3.8L4.2 16.4Z"/><path d="m14.6 6 3.8 3.8"/>',
   verified: '<path d="m12 3 6.5 2.6v5.2c0 4-2.7 7.6-6.5 9-3.8-1.4-6.5-5-6.5-9V5.6Z"/><path d="m9.2 11.8 2 2 3.6-3.9"/>',
   book:     '<path d="M4 5.2A2.2 2.2 0 0 1 6.2 3H19v14.5H6.2A2.2 2.2 0 0 0 4 19.7Z"/><path d="M4 19.7A2.2 2.2 0 0 1 6.2 17.5H19V21H6.2A2.2 2.2 0 0 1 4 18.8Z"/>',
@@ -785,6 +798,46 @@ const BASIC_FOODS = [
   per:{calories,protein,carbs,fat},
 }));
 
+// ---- The day being viewed ----
+//
+// Food and Steps can travel back through the log; everything else — Command,
+// the coach, the weigh-in — always speaks about today, because advice about a
+// day you are only browsing would be misleading. Resets to today whenever you
+// switch sections, so you never land on a stale day and think it is empty.
+let viewDay = todayKey();
+const isToday = ()=>viewDay===todayKey();
+function setViewDay(delta){
+  if(delta===0){ viewDay=todayKey(); return; }
+  const d=new Date(viewDay+"T12:00:00"); d.setDate(d.getDate()+delta);
+  const k=todayKey(d);
+  if(k>todayKey()) return;   // there is nothing to log in the future
+  viewDay=k;
+}
+/** The day strip: back a day, the date, forward a day, and a way home. */
+function dayStrip(){
+  const d=new Date(viewDay+"T12:00:00");
+  const label = isToday() ? "Today"
+    : d.toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"});
+  return `<div class="daynav">
+    <button type="button" data-day="-1" aria-label="Previous day">${icon("chevL")}</button>
+    <span class="d">${esc(label)}</span>
+    <button type="button" data-day="1" aria-label="Next day"${isToday()?" disabled":""}>${icon("chevR")}</button>
+    ${isToday()?"":`<button type="button" class="ghost" data-day="0">Jump to today</button>`}
+  </div>`;
+}
+/** Keep the page subtitle honest when the day strip has travelled. */
+function daySubtitle(todayText, pastText){
+  const el=$("#subtitle"); if(!el) return;
+  el.textContent = isToday() ? todayText
+    : pastText.replace("{d}", new Date(viewDay+"T12:00:00")
+        .toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"}));
+}
+
+/** Wire a rendered day strip to a re-render of the screen it sits on. */
+function wireDayStrip(root, rerender){
+  root.querySelectorAll("[data-day]").forEach(b=>b.onclick=()=>{ setViewDay(+b.dataset.day); rerender(); });
+}
+
 // ---- Water ----
 // Stored in fluid ounces whatever unit is displayed, so switching units never
 // rewrites history.
@@ -792,8 +845,8 @@ const WATER_UNITS = {oz:{label:"fl oz",per:1}, ml:{label:"ml",per:0.033814}, cup
 const getWaterUnit  = ()=>WATER_UNITS[DB.get("waterUnit","oz")] ? DB.get("waterUnit","oz") : "oz";
 const getWaterGoal  = ()=>DB.get("waterGoal",96);            // fl oz
 const getWater      = ()=>DB.get("water",{});
-const waterToday    = ()=>+getWater()[todayKey()]||0;
-function addWater(oz){ const w=getWater(); const k=todayKey(); w[k]=Math.max(0,(+w[k]||0)+oz); DB.set("water",w); }
+const waterOn       = (day=todayKey())=>+getWater()[day]||0;
+function addWater(oz, day=todayKey()){ const w=getWater(); w[day]=Math.max(0,(+w[day]||0)+oz); DB.set("water",w); }
 const getWaterPresets = ()=>DB.get("waterPresets",[8,17,40]);
 
 // ============================================================================
@@ -882,8 +935,8 @@ const getStepGoal = ()=>DB.get("stepGoal", DEFAULT_STEP_GOAL);
 const getSteps = ()=>DB.get("steps", {});
 function setSteps(dateKey, count){ const s=getSteps(); s[dateKey]=count; DB.set("steps",s); }
 /** The last `n` days, oldest first, as [{date,count}]. */
-function stepDays(n=7){
-  const out=[]; const s=getSteps(); const c=new Date();
+function stepDays(n=7, endKey){
+  const out=[]; const s=getSteps(); const c=endKey?new Date(endKey+"T12:00:00"):new Date();
   for(let i=n-1;i>=0;i--){ const d=new Date(c); d.setDate(c.getDate()-i); const k=todayKey(d);
     out.push({date:k, count:+s[k]||0, label:d.toLocaleDateString(undefined,{weekday:"short"})[0]}); }
   return out;
@@ -1118,6 +1171,10 @@ MODULES.forEach(m=>{ const b=document.createElement("button"); b.type="button"; 
   b.innerHTML=`${icon(m.ic)}<span>${m.id}</span>`; b.onclick=()=>show(m.id); nav.append(b); });
 
 function show(name){
+  // Landing on a section always starts at today; the day strip travels from
+  // there. Without this you could leave Food on last Tuesday and come back to
+  // what looks like a day where you ate nothing.
+  if(name!==current) viewDay=todayKey();
   current = name;
   document.querySelectorAll("nav button").forEach(b=>{ const on=b.dataset.module===name; b.classList.toggle("active",on); if(on) b.setAttribute("aria-current","page"); else b.removeAttribute("aria-current"); });
   $("#crumb").textContent = name.toUpperCase();
@@ -1386,7 +1443,7 @@ function renderFitness(){
 // FOOD VIEW
 // ============================================================================
 function renderFood(){
-  const day=todayKey(); const log=DB.get("foodLog",{}); const foods=log[day]||[];
+  const day=viewDay; const log=DB.get("foodLog",{}); const foods=log[day]||[];
   const totals=foodTotals(foods); const t=getTargets();
   const dayNutrition=sumNutrition(foods);
 
@@ -1396,13 +1453,13 @@ function renderFood(){
   const loose=foods.map((f,i)=>({f,i})).filter(x=>!MEALS.includes(x.f.meal));
   if(loose.length) groups.push({name:"Uncategorised", items:loose, loose:true});
 
-  const w=waterToday(), wGoal=getWaterGoal(), unit=getWaterUnit(), u=WATER_UNITS[unit];
+  const w=waterOn(day), wGoal=getWaterGoal(), unit=getWaterUnit(), u=WATER_UNITS[unit];
   const inUnit=v=>{ const n=v/u.per; return n>=100?Math.round(n):+n.toFixed(n<10?1:0); };
 
   $("#view-food").innerHTML = `
     <div class="grid cols-2">
       <div class="panel">
-        <div class="section-title"><h2>Today</h2><button class="primary" id="food-add">Add food</button></div>
+        <div class="section-title"><h2>${isToday()?"Today":"That day"}</h2>${dayStrip()}<button class="primary" id="food-add">Add food</button></div>
         <div class="macro-row">
           ${donut(totals)}
           <div class="macro-legend">
@@ -1440,7 +1497,7 @@ function renderFood(){
     </div>
 
     <div class="panel">
-      <div class="section-title"><h2>Today's meals</h2><span class="tag">${foods.length} ITEM${foods.length===1?"":"S"}</span></div>
+      <div class="section-title"><h2>${isToday()?"Today's meals":"Meals that day"}</h2><span class="tag">${foods.length} ITEM${foods.length===1?"":"S"}</span></div>
       ${groups.map(g=>{
         const kcal=Math.round(g.items.reduce((a,x)=>a+(+x.f.calories||0),0));
         return `<div class="meal-head">
@@ -1464,7 +1521,7 @@ function renderFood(){
     </div>
 
     <div class="panel">
-      <div class="section-title"><h2>Nutrition facts — today</h2>
+      <div class="section-title"><h2>Nutrition facts — ${isToday()?"today":esc(viewDay)}</h2>
         <button class="ghost" id="nf-toggle" aria-expanded="${DB.get("nfOpen",false)}" aria-controls="nf-body">
           ${DB.get("nfOpen",false)?"Hide":"Show"}</button></div>
       <div id="nf-body" ${DB.get("nfOpen",false)?"":"hidden"}>${nutritionFacts(dayNutrition)}</div>
@@ -1475,13 +1532,15 @@ function renderFood(){
   $("#food-targets").onclick=openTargets;
   $("#water-settings").onclick=openWaterSettings;
   $("#water-custom").onclick=openWater;
-  const undo=$("#water-undo"); if(undo) undo.onclick=()=>{ const wt=getWater(); delete wt[todayKey()]; DB.set("water",wt); renderFood(); toast("Water cleared"); };
+  const undo=$("#water-undo"); if(undo) undo.onclick=()=>{ const wt=getWater(); delete wt[viewDay]; DB.set("water",wt); renderFood(); toast("Water cleared"); };
   $("#nf-toggle").onclick=()=>{ DB.set("nfOpen",!DB.get("nfOpen",false)); renderFood(); };
-  $("#view-food").querySelectorAll("[data-water]").forEach(b=>b.onclick=()=>{ addWater(+b.dataset.water); renderFood(); });
+  daySubtitle("Today against your targets.", "{d} — against your targets.");
+  wireDayStrip($("#view-food"), renderFood);
+  $("#view-food").querySelectorAll("[data-water]").forEach(b=>b.onclick=()=>{ addWater(+b.dataset.water, viewDay); renderFood(); });
   $("#view-food").querySelectorAll("[data-addmeal]").forEach(b=>b.onclick=()=>openBrowse(b.dataset.addmeal));
   $("#view-food").querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>openLoggedEntry(+b.dataset.edit));
   $("#view-food").querySelectorAll("[data-food]").forEach(b=>b.onclick=()=>{
-    const l=DB.get("foodLog",{}); (l[todayKey()]||[]).splice(+b.dataset.food,1); DB.set("foodLog",l);
+    const l=DB.get("foodLog",{}); (l[viewDay]||[]).splice(+b.dataset.food,1); DB.set("foodLog",l);
     renderFood(); toast("Removed"); });
 }
 
@@ -1535,8 +1594,8 @@ function nutritionFacts(n){
 
 // ---- STEPS ----
 function renderSteps(){
-  const goal=getStepGoal(); const day=todayKey(); const today=+getSteps()[day]||0;
-  const days=stepDays(7);
+  const goal=getStepGoal(); const day=viewDay; const today=+getSteps()[day]||0;
+  const days=stepDays(7, day);
   const max=Math.max(goal, ...days.map(d=>d.count)) || goal;
   const hit=days.filter(d=>d.count>=goal).length;
   const avg=Math.round(days.reduce((a,d)=>a+d.count,0)/days.length);
@@ -1547,7 +1606,7 @@ function renderSteps(){
   $("#view-steps").innerHTML = `
     <div class="grid cols-2">
       <div class="panel">
-        <div class="section-title"><h2>Today</h2><button class="primary" id="st-add">Log steps</button></div>
+        <div class="section-title"><h2>${isToday()?"Today":"That day"}</h2>${dayStrip()}<button class="primary" id="st-add">Log steps</button></div>
         <div class="rings">${ring(today,goal,"STEPS","")}</div>
         <p class="muted" style="margin:10px 0 0">
           ${today>=goal ? `Goal hit — ${today.toLocaleString()} steps.`
@@ -1556,7 +1615,7 @@ function renderSteps(){
         <button class="ghost" id="st-goal">Change goal</button>
       </div>
       <div class="panel">
-        <div class="section-title"><h2>Last 7 days</h2><span class="tag">${hit}/7 HIT</span></div>
+        <div class="section-title"><h2>${isToday()?"Last 7 days":"7 days to then"}</h2><span class="tag">${hit}/7 HIT</span></div>
         <div class="bars">
           ${days.map(d=>`<div class="bar-col">
             <div class="bar-track"><div class="bar-fill${d.count>=goal?" bar-hit":""}" style="height:${Math.round((d.count/max)*100)}%"></div></div>
@@ -1598,6 +1657,8 @@ function renderSteps(){
         : `<p class="empty">No steps logged yet.</p>`; })()}</div>
     </div>`;
 
+  daySubtitle("Today against your daily goal.", "{d} — against your daily goal.");
+  wireDayStrip($("#view-steps"), renderSteps);
   $("#st-add").onclick=openSteps;
   $("#st-goal").onclick=openStepGoal;
   $("#view-steps").querySelectorAll("[data-stepdel]").forEach(b=>b.onclick=()=>{
@@ -1605,14 +1666,14 @@ function renderSteps(){
 }
 
 function openSteps(){
-  const day=todayKey(); const cur=getSteps()[day];
+  const day=viewDay; const cur=getSteps()[day];
   $("#entry-title").textContent="Log steps";
-  $("#entry-fields").innerHTML=`<label>Steps today</label>
+  $("#entry-fields").innerHTML=`<label>Steps ${isToday()?"today":"that day"}</label>
     <input id="sp-val" inputmode="numeric" value="${cur!=null?cur:""}" placeholder="12500"/>
-    <p class="muted" style="font-size:13px;margin:8px 0 0">One entry per day — saving again updates today.</p>`;
+    <p class="muted" style="font-size:13px;margin:8px 0 0">One entry per day — saving again updates ${isToday()?"today":"that day"}.</p>`;
   $("#entry-form").onsubmit=e=>{ e.preventDefault(); const v=Math.round(parseFloat($("#sp-val").value));
     if(!isFinite(v)||v<0||v>200000) return;
-    setSteps(todayKey(),v); $("#entry-dialog").close(); toast("Steps logged"); renderSteps(); };
+    setSteps(viewDay,v); $("#entry-dialog").close(); toast("Steps logged"); renderSteps(); };
   openDialog($("#entry-dialog")); setTimeout(()=>$("#sp-val").focus(),40);
 }
 
@@ -1847,7 +1908,7 @@ function openItem(it){
 
 /** Log without opening the detail screen — the + button and saved meals. */
 function logItem(it, servings){
-  const day=todayKey(); const log=DB.get("foodLog",{}); const list=(log[day]=log[day]||[]);
+  const day=viewDay; const log=DB.get("foodLog",{}); const list=(log[day]=log[day]||[]);
   if(it.kind==="meal"){
     (it.items||[]).forEach(x=>list.unshift(entryFrom({name:x.name, brand:x.brand, serving:x.serving, per:x.per}, x.servings||1, browseMeal)));
     DB.set("foodLog",log); toast(`${it.name} logged`);
@@ -1908,7 +1969,7 @@ function openDetail(food, opts={}){
     const n=parseFloat($("#d-servings").value);
     if(!isFinite(n)||n<=0){ $("#d-servings").focus(); return; }
     const entry=entryFrom({...detailState.food, serving:detailState.serving}, n, detailState.meal, detailState.time);
-    const day=todayKey(); const log=DB.get("foodLog",{}); const list=(log[day]=log[day]||[]);
+    const day=viewDay; const log=DB.get("foodLog",{}); const list=(log[day]=log[day]||[]);
     if(detailState.editIndex!=null) list[detailState.editIndex]=entry; else list.unshift(entry);
     DB.set("foodLog",log);
     $("#detail-dialog").close();
@@ -1943,7 +2004,7 @@ function paintDetail(){
 
 /** Edit something already in today's log. */
 function openLoggedEntry(index){
-  const list=DB.get("foodLog",{})[todayKey()]||[]; const e=list[index]; if(!e) return;
+  const list=DB.get("foodLog",{})[viewDay]||[]; const e=list[index]; if(!e) return;
   const servings=+e.servings||1;
   const per = e.nutrition ? scaleNutrition(e.nutrition, 1/servings)
                           : {calories:(+e.calories||0)/servings, protein:(+e.protein||0)/servings,
@@ -1998,7 +2059,7 @@ function openQuickAdd(){
     const per={calories:cal};
     [["protein","#qa-p"],["carbs","#qa-c"],["fat","#qa-f"]].forEach(([k,sel])=>{
       const v=parseFloat($(sel).value); if(isFinite(v)) per[k]=v; });
-    const day=todayKey(); const log=DB.get("foodLog",{}); const list=(log[day]=log[day]||[]);
+    const day=viewDay; const log=DB.get("foodLog",{}); const list=(log[day]=log[day]||[]);
     list.unshift(entryFrom({name:$("#qa-name").value.trim()||"Quick add", serving:"1 serving", per}, 1, $("#qa-meal").value));
     DB.set("foodLog",log);
     $("#entry-dialog").close(); if($("#browse-dialog").open) $("#browse-dialog").close();
@@ -2052,7 +2113,7 @@ function openVoiceLog(){
     const parsed=OB.parseFood($("#vl-text").value.trim());
     if(!parsed){ $("#vl-text").focus(); return; }
     if(rec) try{ rec.stop(); }catch(err){}
-    const day=todayKey(); const log=DB.get("foodLog",{}); const list=(log[day]=log[day]||[]);
+    const day=viewDay; const log=DB.get("foodLog",{}); const list=(log[day]=log[day]||[]);
     list.unshift(entryFrom({name:parsed.name, serving:parsed.serving||"1 serving",
       per:{calories:parsed.calories, protein:parsed.protein, carbs:parsed.carbs, fat:parsed.fat}}, 1, $("#vl-meal").value));
     DB.set("foodLog",log);
@@ -2086,10 +2147,10 @@ function openScanNotice(kind){
 
 // ---- My Meals: name a set of today's entries and re-log it in one tap ----
 function openCreateMeal(){
-  const list=DB.get("foodLog",{})[todayKey()]||[];
+  const list=DB.get("foodLog",{})[viewDay]||[];
   $("#entry-title").textContent="Create a meal";
   $("#entry-fields").innerHTML = list.length ? `
-    <p class="note" style="margin-top:12px">Pick what belongs in it from today's log. Logging the meal later adds every item at once.</p>
+    <p class="note" style="margin-top:12px">Pick what belongs in it from ${isToday()?"today's":"that day's"} log. Logging the meal later adds every item at once.</p>
     <label for="cm-name">Meal name</label><input id="cm-name" placeholder="Post-training plate"/>
     <div style="margin-top:14px">${list.map((e,i)=>`
       <label class="row" style="gap:10px;margin:0;padding:9px 0;border-top:1px solid var(--rim);font-size:14px;color:var(--text)">
@@ -2164,11 +2225,11 @@ function openWater(){
     <label for="wa-val">Amount (${esc(u.label)})</label><input id="wa-val" inputmode="decimal" placeholder="16"/>
     <div class="presets">${getWaterPresets().map(oz=>`<button type="button" class="btn" data-wp="${oz}">+${+(oz/u.per).toFixed(oz/u.per<10?1:0)}</button>`).join("")}</div>`;
   $("#entry-fields").querySelectorAll("[data-wp]").forEach(b=>b.onclick=()=>{
-    addWater(+b.dataset.wp); $("#entry-dialog").close(); toast("Water logged"); refreshFood(); });
+    addWater(+b.dataset.wp, viewDay); $("#entry-dialog").close(); toast("Water logged"); refreshFood(); });
   $("#entry-form").onsubmit=e=>{
     e.preventDefault(); const v=parseFloat($("#wa-val").value);
     if(!isFinite(v)||v<=0) return;
-    addWater(v*u.per); $("#entry-dialog").close(); toast("Water logged"); refreshFood(); };
+    addWater(v*u.per, viewDay); $("#entry-dialog").close(); toast("Water logged"); refreshFood(); };
   openDialog($("#entry-dialog")); setTimeout(()=>$("#wa-val").focus(),40);
 }
 
@@ -2413,7 +2474,12 @@ clock(); setInterval(clock,1000);
 // A Shortcut may have opened us with ?steps=NNNN — apply it before rendering.
 const ingested=ingestStepsFromUrl();
 show(ingested ? "Steps" : "Command");
-if(ingested) toast(`${ingested.n.toLocaleString()} steps saved`);
+if(ingested){
+  // A Shortcut backfilling an older day (&date=) should land on that day, not
+  // on today looking like nothing happened.
+  if(ingested.day!==todayKey()){ viewDay=ingested.day; renderSteps(); }
+  toast(`${ingested.n.toLocaleString()} steps saved`);
+}
 </script>
 </body>
 </html>

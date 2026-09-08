@@ -9,8 +9,8 @@ serves `index.html` at `/`). All data is stored locally in the browser under
 - **Command** — orbital-core hero, quick actions grouped into All / Personal /
   Planning / Business tabs, coach signals, daily vitals.
 - **Fitness** — lifts + MMA / mat work, a repeating weekly plan, and a rules
-  coach that cross-references training, food and rest. Includes an Obsidian
-  importer (paste daily notes → weigh-ins, lifts, food).
+  coach that cross-references training, food and rest. Includes the Obsidian
+  importer.
 - **Food** — a full food log. Meals (Breakfast/Lunch/Dinner/Snacks), a macro
   ring by calorie share, percent-of-goal bars, and the whole nutrition panel
   (20 nutrients, indented sub-rows, derived Net Carbs). Sources: History, My
@@ -22,6 +22,16 @@ serves `index.html` at `/`). All data is stored locally in the browser under
 - **Steps** — daily goal ring, 7-day chart, and an Apple Shortcut recipe that
   pushes Health's step count in via `?steps=NNNN`.
 - **Planner / Calendar / Journal / Reselling / Money** — quick capture lists.
+
+## Obsidian
+Paste daily notes into the importer (Fitness → Import Obsidian) and it reads
+weigh-ins, steps, water, lifts and food. Food filed under `## Breakfast` /
+`## Lunch` / `## Dinner` / `## Snacks` headings lands in that meal; a quantity
+before the calories (`Chicken breast 8 oz 372 cal`) becomes the serving.
+Imported foods are ordinary log entries — they show in History, reopen in the
+detail editor and rescale by servings, tagged `Obsidian` so you can see where
+they came from. Re-importing a note you have already imported does not
+duplicate the day.
 
 Every view is keyboard-navigable: `Ctrl`/`Cmd`-`K` jumps to the action-search
 launcher in the header, arrow keys move through the quick-action tabs, and a

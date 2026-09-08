@@ -521,8 +521,20 @@
 <!-- Obsidian import -->
 <dialog id="obsidian-dialog" aria-labelledby="obsidian-title">
   <div class="dialog-top"><h2 id="obsidian-title">Import from Obsidian</h2><button type="button" class="close" data-close aria-label="Close"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
-  <p class="muted" style="font-size:13px;margin:10px 0 0">Paste daily notes. Reads weigh-ins, lifts and food. Nothing is saved until you press Import.</p>
-  <textarea id="obsidian-text" placeholder="--- \ndate: 2026-09-07\nweight: 184\n---\n## Training\nBench Press 185x8, 185x8\n## Food\nOats 350 cal, 12g protein"></textarea>
+  <p class="muted" style="font-size:13px;margin:10px 0 0">Paste daily notes. Reads weigh-ins, steps, water, lifts and food — and files food under <code>## Breakfast</code> / <code>## Lunch</code> / <code>## Dinner</code> / <code>## Snacks</code> headings when your notes use them. Nothing is saved until you press Import, and re-importing a note you already imported won't duplicate the day.</p>
+  <textarea id="obsidian-text" placeholder="## 2026-09-07
+weight:: 184
+steps:: 14200
+water:: 74 oz
+
+## Breakfast
+Oats 350 cal, 12g protein, 60g carbs, 6g fat
+
+## Lunch
+Chicken breast 8 oz 372 cal, 70g protein
+
+## Training
+Bench Press 185x8, 185x8"></textarea>
   <div id="obsidian-preview"></div>
   <div class="dialog-actions">
     <button type="button" class="btn" id="obsidian-parse">Preview</button>
@@ -984,35 +996,78 @@ const OB = (()=>{
     return sets.length?{name,sets}:null;
   }
   const P={calories:/(\d+(?:\.\d+)?)\s*(?:kcal|cal(?:ories)?)\b/i,protein:/(\d+(?:\.\d+)?)\s*g?\s*(?:p\b|protein)/i,carbs:/(\d+(?:\.\d+)?)\s*g?\s*(?:c\b|carbs?)/i,fat:/(\d+(?:\.\d+)?)\s*g?\s*(?:f\b|fat)/i};
-  function parseFood(line){
+  // A quantity sitting between the name and the calorie figure is the serving:
+  // "Chicken breast 8 oz 372 cal" -> "8 oz". Only the text BEFORE the calories
+  // is searched, so "66g carbs" further along can't be mistaken for one.
+  const SERVING=/(\d+(?:[.\/]\d+)?)\s*(fl\s?oz|oz|g|kg|lbs?|ml|l|cups?|tbsp|tsp|slices?|scoops?|pieces?|bars?|pouch(?:es)?|cans?|eggs?|servings?)\b/i;
+  function parseFood(line, meal){
     const c=line.replace(/^\s*(?:[-*+]\s*)?/,"").trim(); const cal=c.match(P.calories); if(!cal) return null;
     const i=c.search(/\d/); let name=c.slice(0,i).replace(/[—–\-:,|]+\s*$/,"").trim()||"Food";
+    const head=c.slice(i, cal.index); const sv=head.match(SERVING);
     const r=k=>{ const m=c.match(P[k]); return m?parseFloat(m[1]):0; };
-    return {name,calories:+cal[1],protein:r("protein"),carbs:r("carbs"),fat:r("fat")};
+    return {name, serving: sv?sv[0].replace(/\s+/g," ").trim():null, meal: meal||null,
+            calories:+cal[1],protein:r("protein"),carbs:r("carbs"),fat:r("fat")};
   }
   const TRAIN=/^#{1,6}\s*(training|workout|lifts?|gym|session|strength)\b/i;
   const FOODH=/^#{1,6}\s*(food|meals?|nutrition|diet|eating)\b/i;
+  // A meal heading both selects the Food section and names the meal the lines
+  // under it belong to, so "## Lunch" files straight into Lunch.
+  const MEALH=/^#{1,6}\s*(breakfast|brunch|lunch|dinner|supper|snacks?|pre[- ]?workout|post[- ]?workout|intra[- ]?workout)\b/i;
+  const MEAL_MAP={breakfast:"Breakfast",brunch:"Breakfast",lunch:"Lunch",dinner:"Dinner",supper:"Dinner",
+    snack:"Snacks",snacks:"Snacks",preworkout:"Snacks",postworkout:"Snacks",intraworkout:"Snacks"};
+  const mealFrom = word => MEAL_MAP[word.toLowerCase().replace(/[- ]/g,"")] || null;
+  /** "74 oz", "2.5 L", "1800 ml", "9 cups" -> fluid ounces, which is how the
+   *  dashboard stores water underneath whatever unit it displays. */
+  function waterFrom(f){
+    for(const k of ["water","hydration","fluids","fluid"]){
+      const raw=f[k]; if(raw==null) continue;
+      const m=String(raw).match(/(\d+(?:\.\d+)?)\s*(fl\s?oz|oz|ml|l|liters?|litres?|cups?)?/i);
+      if(!m) continue; const v=parseFloat(m[1]); if(!isFinite(v)||v<=0) continue;
+      const u=(m[2]||"oz").toLowerCase().replace(/\s+/g,"");
+      if(/^(l|liter|liters|litre|litres)$/.test(u)) return v*33.814;
+      if(u==="ml") return v*0.033814;
+      if(/^cups?$/.test(u)) return v*8;
+      return v;
+    }
+    return null;
+  }
+  function stepsFrom(f){
+    for(const k of ["steps","step count","stepcount"]){
+      const raw=f[k]; if(raw==null) continue;
+      const v=parseFloat(String(raw).replace(/,/g,""));
+      if(isFinite(v)&&v>=0&&v<=200000) return Math.round(v);
+    }
+    return null;
+  }
   const HEAD=/^#{1,6}\s+/; const DATEH=/^#{1,6}\s+.*?(\d{4}-\d{2}-\d{2})/;
   function parseNote(text, fallback){
     const {f:fm,body}=frontmatter(text); const f={...fm,...inline(body)};
     const dh=body.match(DATEH);
     const date=(fm.date&&fm.date.match(ISO)?.[1]) || (dh?dh[1]:null) || fallback;
-    const weight=weightFrom(f); const lifts=[]; const foods=[]; let sec="?";
+    const weight=weightFrom(f); const water=waterFrom(f); const steps=stepsFrom(f);
+    const lifts=[]; const foods=[]; let sec="?"; let meal=null;
     for(const raw of body.split(/\r?\n/)){ const line=raw.trim(); if(!line) continue;
-      if(TRAIN.test(line)){sec="t";continue} if(FOODH.test(line)){sec="f";continue} if(HEAD.test(line)){sec="?";continue}
+      const mh=line.match(MEALH);
+      // Checked before the generic heading rule, which would otherwise close
+      // the food section the moment it saw "## Lunch".
+      if(mh){ sec="f"; meal=mealFrom(mh[1]); continue; }
+      if(TRAIN.test(line)){sec="t"; meal=null; continue}
+      if(FOODH.test(line)){sec="f"; meal=null; continue}
+      if(HEAD.test(line)){sec="?"; meal=null; continue}
       if(line.includes("::")) continue;
       if(sec==="t"){ const l=parseLift(line); if(l) lifts.push(l); continue; }
-      if(sec==="f"){ const fo=parseFood(line); if(fo) foods.push(fo); continue; }
-      const fo=parseFood(line); if(fo){foods.push(fo);continue} const l=parseLift(line); if(l) lifts.push(l);
+      if(sec==="f"){ const fo=parseFood(line, meal); if(fo) foods.push(fo); continue; }
+      const fo=parseFood(line, meal); if(fo){foods.push(fo);continue} const l=parseLift(line); if(l) lifts.push(l);
     }
-    return {date,weight,lifts,foods};
+    return {date,weight,water,steps,lifts,foods};
   }
   function parseVault(text){
     const lines=(text||"").split(/\r?\n/); const chunks=[]; let cur=[];
     for(const line of lines){ if(DATEH.test(line)&&cur.some(l=>l.trim())){chunks.push(cur.join("\n"));cur=[line]} else cur.push(line); }
     if(cur.length) chunks.push(cur.join("\n"));
     const days=[];
-    for(const ch of chunks){ const p=parseNote(ch,null); if(!p.date) continue; if(!p.weight&&!p.lifts.length&&!p.foods.length) continue; days.push(p); }
+    for(const ch of chunks){ const p=parseNote(ch,null); if(!p.date) continue;
+      if(p.weight==null&&p.water==null&&p.steps==null&&!p.lifts.length&&!p.foods.length) continue; days.push(p); }
     days.sort((a,b)=>a.date.localeCompare(b.date)); return days;
   }
   return {parseVault, parseFood};
@@ -1998,7 +2053,7 @@ function openVoiceLog(){
     if(!parsed){ $("#vl-text").focus(); return; }
     if(rec) try{ rec.stop(); }catch(err){}
     const day=todayKey(); const log=DB.get("foodLog",{}); const list=(log[day]=log[day]||[]);
-    list.unshift(entryFrom({name:parsed.name, serving:"1 serving",
+    list.unshift(entryFrom({name:parsed.name, serving:parsed.serving||"1 serving",
       per:{calories:parsed.calories, protein:parsed.protein, carbs:parsed.carbs, fat:parsed.fat}}, 1, $("#vl-meal").value));
     DB.set("foodLog",log);
     $("#entry-dialog").close(); if($("#browse-dialog").open) $("#browse-dialog").close();
@@ -2210,23 +2265,68 @@ $("#obsidian-parse").onclick=()=>{
   obsidianDays=OB.parseVault($("#obsidian-text").value);
   const box=$("#obsidian-preview");
   if(!obsidianDays.length){ box.innerHTML=`<p class="empty">Nothing recognised. Check the format hint above.</p>`; $("#obsidian-import").disabled=true; return; }
-  const w=obsidianDays.filter(d=>d.weight!=null).length, wo=obsidianDays.filter(d=>d.lifts.length).length, fo=obsidianDays.reduce((a,d)=>a+d.foods.length,0);
-  box.innerHTML=`<p class="tag" style="margin:14px 0 6px">FOUND</p><p class="muted" style="font-size:13px">${obsidianDays.length} day(s) · ${w} weigh-in(s) · ${wo} workout(s) · ${fo} food entr${fo===1?"y":"ies"}</p>`
-    + obsidianDays.map(d=>`<div class="entry"><div class="body"><strong>${esc(d.date)}</strong><small>${d.weight!=null?"weight "+d.weight+" · ":""}${d.lifts.length} lifts · ${d.foods.length} foods</small></div></div>`).join("");
+  const w=obsidianDays.filter(d=>d.weight!=null).length, wo=obsidianDays.filter(d=>d.lifts.length).length;
+  const fo=obsidianDays.reduce((a,d)=>a+d.foods.length,0);
+  const wa=obsidianDays.filter(d=>d.water!=null).length, st=obsidianDays.filter(d=>d.steps!=null).length;
+  const meals=obsidianDays.reduce((a,d)=>a+d.foods.filter(f=>f.meal).length,0);
+  box.innerHTML=`<p class="tag" style="margin:14px 0 6px">FOUND</p>
+    <p class="muted" style="font-size:13px">${obsidianDays.length} day(s) · ${w} weigh-in(s) · ${wo} workout(s) · ${fo} food entr${fo===1?"y":"ies"}${meals?` (${meals} under a meal heading)`:""} · ${wa} water · ${st} step count(s)</p>`
+    + obsidianDays.map(d=>{
+        const bits=[d.weight!=null?"weight "+d.weight:null, d.lifts.length?d.lifts.length+" lifts":null,
+                    d.foods.length?d.foods.length+" foods":null, d.water!=null?Math.round(d.water)+" oz water":null,
+                    d.steps!=null?d.steps.toLocaleString()+" steps":null].filter(Boolean);
+        return `<div class="entry"><div class="body"><strong>${esc(d.date)}</strong><small>${esc(bits.join(" · ")||"nothing recognised")}</small></div></div>`;
+      }).join("");
   $("#obsidian-import").disabled=false;
 };
+/**
+ * A note's food line becomes a first-class log entry — meal, serving and a
+ * nutrition object — so an imported food behaves exactly like one logged by
+ * hand: it groups under its meal, shows up in History, and reopens in the
+ * detail editor. Brand records where it came from.
+ */
+function obsidianEntry(fo){
+  const per={calories:+fo.calories||0, protein:+fo.protein||0, carbs:+fo.carbs||0, fat:+fo.fat||0};
+  const entry={
+    id:uid(), name:fo.name, brand:"Obsidian", serving:fo.serving||"1 serving", servings:1,
+    calories:per.calories, protein:per.protein, carbs:per.carbs, fat:per.fat, nutrition:per,
+  };
+  // Only claim a meal when the note actually said one — an unlabelled line
+  // groups as Uncategorised rather than being filed under a guess.
+  if(MEALS.includes(fo.meal)) entry.meal=fo.meal;
+  return entry;
+}
+
 $("#obsidian-import").onclick=()=>{
   const foodLog=DB.get("foodLog",{}), weigh=DB.get("weighins",{}), lifts=DB.get("lifts",[]);
+  const steps=getSteps(), water=getWater();
   const liftDates=new Set(lifts.map(w=>todayKey(new Date(w.date))));
-  let nf=0,nw=0,nl=0;
+  let nf=0,nw=0,nl=0,nwa=0,ns=0,dup=0;
   obsidianDays.forEach(d=>{
     if(d.weight!=null && weigh[d.date]==null){ weigh[d.date]=d.weight; nw++; }
+    if(d.steps!=null && steps[d.date]==null){ steps[d.date]=d.steps; ns++; }
+    if(d.water!=null && water[d.date]==null){ water[d.date]=d.water; nwa++; }
     if(d.lifts.length && !liftDates.has(d.date)){ lifts.unshift({id:"ob-"+d.date,date:new Date(d.date+"T12:00:00").toISOString(),exercises:d.lifts}); nl++; }
-    if(d.foods.length){ (foodLog[d.date]=foodLog[d.date]||[]).push(...d.foods); nf+=d.foods.length; }
+    if(d.foods.length){
+      const list=(foodLog[d.date]=foodLog[d.date]||[]);
+      // Re-importing a note you have already imported must not double the day,
+      // so a food already on that date at the same calories is skipped.
+      const seen=new Set(list.map(f=>(f.name||"").toLowerCase()+"|"+Math.round(+f.calories||0)));
+      d.foods.forEach(fo=>{
+        const key=(fo.name||"").toLowerCase()+"|"+Math.round(+fo.calories||0);
+        if(seen.has(key)){ dup++; return; }
+        seen.add(key); list.push(obsidianEntry(fo)); nf++;
+      });
+    }
   });
   lifts.sort((a,b)=>new Date(b.date)-new Date(a.date));
   DB.set("foodLog",foodLog); DB.set("weighins",weigh); DB.set("lifts",lifts);
-  $("#obsidian-dialog").close(); toast(`Imported ${nw} weigh-ins, ${nl} workouts, ${nf} foods`);
+  DB.set("steps",steps); DB.set("water",water);
+  $("#obsidian-dialog").close();
+  const parts=[`${nw} weigh-ins`,`${nl} workouts`,`${nf} foods`];
+  if(ns) parts.push(`${ns} step counts`);
+  if(nwa) parts.push(`${nwa} water`);
+  toast(`Imported ${parts.join(", ")}${dup?` · skipped ${dup} already there`:""}`);
   show(current);
 };
 

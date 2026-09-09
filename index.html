@@ -354,6 +354,61 @@
   .delta{font-size:12.5px;font-weight:600}
   .delta.up{color:var(--success)} .delta.down{color:var(--warn)} .delta.flat{color:var(--muted)}
 
+  /* ---- Month grid ---- */
+  .cal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+  .cal-head h2{margin:0;font-size:17px;font-weight:600}
+  .cal-nav{display:flex;gap:6px;align-items:center}
+  .cal-nav button{width:32px;height:32px;display:grid;place-items:center;border:1px solid var(--rim);
+    border-radius:var(--radius-sm);background:var(--s1);color:var(--muted);transition:var(--dur)}
+  .cal-nav button:hover{color:var(--text);background:var(--s2);border-color:var(--rim-strong)}
+  .cal-nav button.wide{width:auto;padding:0 12px;font-size:12.5px;font-weight:600}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+  .cal-dow{font:10px ui-monospace,"Courier New",monospace;letter-spacing:1.2px;color:var(--faint);
+    text-align:center;padding:4px 0 6px}
+  .cal-day{min-height:62px;padding:6px;border:1px solid transparent;border-radius:var(--radius-sm);
+    background:var(--s1);color:var(--muted);display:flex;flex-direction:column;gap:5px;
+    align-items:flex-start;text-align:left;transition:var(--dur)}
+  .cal-day:hover{background:var(--s2)}
+  .cal-day.out{opacity:.32}
+  .cal-day.today{border-color:var(--rim-strong)}
+  .cal-day.today .n{color:var(--lav);font-weight:700}
+  .cal-day[aria-pressed="true"]{background:var(--tint);border-color:var(--rim-strong)}
+  .cal-day .n{font-size:12.5px;line-height:1}
+  .cal-dots{display:flex;flex-wrap:wrap;gap:3px}
+  .cal-dot{width:6px;height:6px;border-radius:99px;flex:none}
+  .cal-more{font:9px ui-monospace,"Courier New",monospace;color:var(--faint)}
+  @media (max-width:520px){ .cal-day{min-height:48px;padding:4px} .cal-day .n{font-size:11.5px} }
+
+  /* ---- One event, wherever it came from ---- */
+  .ev{display:flex;gap:12px;align-items:flex-start;padding:11px 0;border-top:1px solid var(--rim)}
+  .ev:first-child{border-top:0}
+  .ev .when{flex:none;width:60px;font:11px ui-monospace,"Courier New",monospace;
+    letter-spacing:.6px;padding-top:2px}
+  .ev .when b{display:block;font-weight:400;color:var(--muted)}
+  .ev .when i{display:block;font-style:normal;color:var(--faint);margin-top:2px}
+  .ev .bar{flex:none;width:3px;align-self:stretch;border-radius:99px;min-height:26px}
+  .ev .body{flex:1;min-width:0}
+  .ev .body strong{font-size:14.5px;font-weight:600;display:block}
+  .ev .body small{display:block;color:var(--faint);font-size:12px;margin-top:3px}
+  .ev .body p{margin:4px 0 0;font-size:13px;color:var(--muted)}
+  .ev.done strong{text-decoration:line-through;color:var(--muted)}
+  .ev .acts{flex:none;display:flex;gap:2px;opacity:0;transition:var(--dur)}
+  .ev:hover .acts,.ev:focus-within .acts{opacity:1}
+  @media (hover:none){ .ev .acts{opacity:1} }
+  .srcline{display:flex;align-items:center;gap:9px;padding:9px 0;border-top:1px solid var(--rim)}
+  .srcline:first-of-type{border-top:0}
+  .srcline .sw{width:10px;height:10px;border-radius:3px;flex:none}
+  .srcline .nm{flex:1;min-width:0;font-size:14px}
+  details.how{margin-top:14px;border-top:1px solid var(--rim);padding-top:12px}
+  details.how summary{cursor:pointer;font-size:13px;font-weight:600;color:var(--accent);list-style:none}
+  details.how summary::-webkit-details-marker{display:none}
+  details.how summary::before{content:"+ ";font-weight:400}
+  details.how[open] summary::before{content:"− "}
+  details.how ol{margin:10px 0 0;padding-left:20px;color:var(--muted);font-size:13px;line-height:1.75}
+  details.how p{margin:10px 0 0;color:var(--faint);font-size:12.5px}
+  .mono{font:12px ui-monospace,"Courier New",monospace;color:var(--lav);background:var(--s2);
+    padding:1px 6px;border-radius:4px;border:1px solid var(--rim);word-break:break-all}
+
   /* ---- Planner / Calendar ---- */
   .due{font:10px ui-monospace,"Courier New",monospace;letter-spacing:1.2px;padding:3px 9px;
     border-radius:99px;border:1px solid var(--rim);color:var(--muted);white-space:nowrap;flex:none}
@@ -649,6 +704,7 @@ Bench Press 185x8, 185x8"></textarea>
 const DB = {
   get(key, fallback){ try{ const r = localStorage.getItem("cd_"+key); return r ? JSON.parse(r) : fallback; }catch(e){ return fallback; } },
   set(key, val){ try{ localStorage.setItem("cd_"+key, JSON.stringify(val)); }catch(e){} },
+  del(key){ try{ localStorage.removeItem("cd_"+key); }catch(e){} },
 };
 const todayKey = (d=new Date())=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 const uid = ()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
@@ -1404,7 +1460,9 @@ function upNext(limit=5){
     kind:"task", icon:"planner", title:t.title, notes:t.notes,
     date:t.due, sort:dateSort(t.due), prio:t.priority,
   }));
-  DB.get("events",[]).forEach(e=>{
+  // Events you typed and events Google holds, side by side: a meeting you did
+  // not enter here is still the next thing coming at you.
+  DB.get("events",[]).concat(gcalEvents()).forEach(e=>{
     // An event with no real date is not "next" — and one already past is not
     // coming up, however recently it was.
     if(!isDateKey(e.date) || dayDelta(e.date)<0) return;
@@ -1728,7 +1786,7 @@ function runCoach(){
   const openTasks=DB.get("tasks",[]).filter(x=>!x.done);
   const overdue=openTasks.filter(x=>isDateKey(x.due)&&dayDelta(x.due)<0);
   if(overdue.length) out.push([`${overdue.length} task${overdue.length===1?"":"s"} overdue.`,"warn"]);
-  const evToday=DB.get("events",[]).filter(x=>x.date===day)
+  const evToday=DB.get("events",[]).concat(gcalEvents()).filter(x=>x.date===day)
     .sort((a,b)=>(a.time||"99:99").localeCompare(b.time||"99:99"));
   if(evToday.length) out.push([
     `${evToday.length} thing${evToday.length===1?"":"s"} on the calendar today${evToday[0].time?` — ${esc(evToday[0].title)} at ${evToday[0].time}`:""}.`,"info"]);
@@ -3041,125 +3099,530 @@ function taskRow(t){
 }
 
 // ============================================================================
+// GOOGLE CALENDAR
+//
+// Sign-in happens in the browser, never on a server, and that is the whole
+// point: this dashboard is a public URL with no login, so an /api function
+// holding a calendar key would hand the calendar to anyone who found the URL.
+// A Google OAuth client id is public by design, and the token it returns
+// belongs to whoever signed in — so the calendar is yours and nobody else's.
+//
+// The token lives in sessionStorage, so it dies with the tab rather than
+// sitting on disk. The events it fetched are cached in localStorage with the
+// rest of the app's data, so the month still draws before a token comes back,
+// and after one expires.
+// ============================================================================
+const GCAL_SCOPE = "https://www.googleapis.com/auth/calendar.readonly";
+const GCAL_BACK = 45, GCAL_FWD = 180;   // days of calendar to keep locally
+
+const gcalClientId   = ()=>DB.get("gcalClientId","");
+const gcalConfigured = ()=>!!gcalClientId();
+const gcalCache      = ()=>{ const c=DB.get("gcalCache",null); return (c&&Array.isArray(c.events))?c:null; };
+const gcalEvents     = ()=>gcalCache()?.events ?? [];
+const gcalSyncedAt   = ()=>gcalCache()?.at ?? 0;
+const gcalCalendars  = ()=>DB.get("gcalCalendars",[]);
+const gcalHidden     = ()=>new Set(DB.get("gcalHidden",[]));
+/** Connected means we have either a live token or a sync that already landed. */
+const gcalConnected  = ()=>gcalConfigured() && (!!gcalToken() || !!gcalCache());
+let gcalBusy=false, gcalError="", gcalEditingId=false;
+
+function gcalToken(){
+  try{
+    const t=JSON.parse(sessionStorage.getItem("cd_gcal_token")||"null");
+    return (t && t.token && t.expires > Date.now()+30000) ? t.token : null;
+  }catch(e){ return null; }
+}
+function setGcalToken(token, expiresIn){
+  try{ sessionStorage.setItem("cd_gcal_token",
+    JSON.stringify({token, expires:Date.now()+((+expiresIn||3600)*1000)})); }catch(e){}
+}
+function clearGcalToken(){ try{ sessionStorage.removeItem("cd_gcal_token"); }catch(e){} }
+
+let gsiLoad=null;
+function loadGsi(){
+  if(window.google?.accounts?.oauth2) return Promise.resolve();
+  if(gsiLoad) return gsiLoad;
+  gsiLoad=new Promise((res,rej)=>{
+    const el=document.createElement("script");
+    el.src="https://accounts.google.com/gsi/client"; el.async=true; el.defer=true;
+    el.onload=()=>res();
+    el.onerror=()=>{ gsiLoad=null; rej(new Error("Could not reach Google. Check the connection, and any content blocker.")); };
+    document.head.append(el);
+  });
+  return gsiLoad;
+}
+
+/** Google's own failures, said plainly. The popup ones are by far the common
+ *  pair, and neither is obvious from the raw event. */
+function gcalAuthError(e){
+  const t=String((e&&(e.type||e.message))||"");
+  if(/popup_closed/i.test(t)) return "The Google window closed before sign-in finished.";
+  if(/popup_failed|popup_blocked/i.test(t)) return "The browser blocked Google's sign-in window. Allow pop-ups for this site, then try again.";
+  return "Google sign-in did not complete." + (e&&e.message ? " "+e.message : "");
+}
+
+/** Ask Google for an access token. Opens a pop-up, so it must be called from
+ *  a real click — browsers block one that comes out of nowhere. */
+function gcalAuth(){
+  if(!gcalConfigured()) return Promise.reject(new Error("Add your Google client ID first."));
+  return loadGsi().then(()=>new Promise((res,rej)=>{
+    google.accounts.oauth2.initTokenClient({
+      client_id: gcalClientId(),
+      scope: GCAL_SCOPE,
+      // Empty prompt: Google asks for consent the first time and stays quiet
+      // on every sign-in after that.
+      prompt: "",
+      callback: r => r.access_token
+        ? (setGcalToken(r.access_token, r.expires_in), res(r.access_token))
+        : rej(new Error(r.error_description || r.error || "Google did not return a token.")),
+      error_callback: e => rej(new Error(gcalAuthError(e))),
+    }).requestAccessToken();
+  }));
+}
+
+async function gcalApi(path, params, token){
+  const url=new URL("https://www.googleapis.com/calendar/v3/"+path);
+  Object.entries(params||{}).forEach(([k,v])=>{ if(v!=null) url.searchParams.set(k,v); });
+  const r=await fetch(url, {headers:{Authorization:"Bearer "+token}});
+  if(r.status===401 || r.status===403){
+    clearGcalToken();
+    throw new Error("Google turned the request down. Connect again.");
+  }
+  if(!r.ok) throw new Error("Google Calendar answered "+r.status+".");
+  return r.json();
+}
+
+/** Google descriptions arrive as HTML. Nothing here is ever injected — every
+ *  field is escaped at render — but stripping the tags keeps "<br>" out of
+ *  the notes line. */
+const stripTags = v => String(v??"")
+  .replace(/<br\s*\/?>/gi,"\n").replace(/<\/p>/gi,"\n").replace(/<[^>]*>/g,"")
+  .replace(/&nbsp;/gi," ").replace(/&lt;/gi,"<").replace(/&gt;/gi,">")
+  .replace(/&quot;/gi,'"').replace(/&#39;/gi,"'").replace(/&amp;/gi,"&")
+  .replace(/\n{3,}/g,"\n\n").trim();
+
+const hhmm = d => String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");
+
+/** One Google event in this app's shape: a date key and a local clock time,
+ *  the same pair a hand-typed event carries, so the two sort together. */
+function gcalEvent(it, cal){
+  if(it.status==="cancelled") return null;
+  const st=it.start||{}, en=it.end||{};
+  const allDay=!!st.date;
+  const raw=allDay ? st.date : st.dateTime;
+  if(!raw) return null;
+  const d=allDay ? new Date(raw+"T12:00:00") : new Date(raw);
+  if(isNaN(d)) return null;
+  return {
+    id:"g:"+cal.id+":"+it.id, source:"google",
+    calendarId:cal.id, calendar:cal.name, color:cal.color,
+    title:it.summary||"(no title)",
+    date:todayKey(d), time:allDay?"":hhmm(d),
+    endTime:(!allDay && en.dateTime && !isNaN(new Date(en.dateTime))) ? hhmm(new Date(en.dateTime)) : "",
+    allDay, location:it.location||"", notes:stripTags(it.description),
+    link:it.htmlLink||"",
+  };
+}
+
+/** Pull the calendar list, then a window of events from each one that is not
+ *  switched off. singleEvents expands repeats, so a weekly session arrives as
+ *  the dates it actually falls on rather than a rule to apply here. */
+async function gcalSync(token){
+  const list=await gcalApi("users/me/calendarList", {maxResults:60, minAccessRole:"reader"}, token);
+  const cals=(list.items||[]).map(c=>({
+    id:c.id, name:c.summaryOverride||c.summary||c.id,
+    color:c.backgroundColor||"#9b5cff", primary:!!c.primary,
+  }));
+  DB.set("gcalCalendars", cals);
+  const hidden=gcalHidden();
+  const timeMin=new Date(Date.now()-GCAL_BACK*864e5).toISOString();
+  const timeMax=new Date(Date.now()+GCAL_FWD*864e5).toISOString();
+  const events=[];
+  for(const c of cals){
+    if(hidden.has(c.id)) continue;
+    const page=await gcalApi("calendars/"+encodeURIComponent(c.id)+"/events",
+      {timeMin, timeMax, singleEvents:true, orderBy:"startTime", maxResults:250}, token);
+    (page.items||[]).forEach(it=>{ const e=gcalEvent(it,c); if(e) events.push(e); });
+  }
+  DB.set("gcalCache", {at:Date.now(), events});
+  return events;
+}
+
+/** Connect or refresh, and redraw whatever is on screen. Reuses a live token
+ *  when there is one, so a plain refresh does not reopen the Google window. */
+async function gcalRefresh({interactive=true}={}){
+  if(gcalBusy) return;
+  let token=gcalToken();
+  if(!token && !interactive) return;
+  gcalBusy=true; gcalError=""; redrawCalendarish();
+  try{
+    if(!token) token=await gcalAuth();
+    await gcalSync(token);
+    toast("Calendar synced");
+  }catch(err){
+    gcalError=err.message||String(err);
+  }finally{
+    gcalBusy=false; redrawCalendarish();
+  }
+}
+
+function gcalDisconnect(){
+  const t=gcalToken();
+  if(t && window.google?.accounts?.oauth2){ try{ google.accounts.oauth2.revoke(t); }catch(e){} }
+  clearGcalToken();
+  DB.del("gcalCache"); DB.del("gcalCalendars"); DB.del("gcalHidden");
+  gcalError=""; toast("Google Calendar disconnected"); redrawCalendarish();
+}
+
+/** With a live token already in hand, a stale cache refreshes itself. Pressing
+ *  Sync should be for when you want it *now*, not for routine upkeep. Never
+ *  interactive: a pop-up nobody asked for would be blocked anyway. */
+let gcalAutoAt = 0;
+function gcalAutoSync(){
+  if(gcalBusy || !gcalToken()) return;
+  if(Date.now()-gcalSyncedAt() < 5*60000) return;   // fresh enough
+  if(Date.now()-gcalAutoAt   < 60000) return;       // and do not hammer it
+  gcalAutoAt=Date.now();
+  gcalRefresh({interactive:false});
+}
+
+/** Google events touch three screens, so a sync repaints whichever is up. */
+function redrawCalendarish(){
+  if(current==="Calendar") renderCalendar();
+  else if(current==="Command") renderCommand();
+}
+
+/** How long ago the cache landed, for the status line. */
+function agoLabel(ms){
+  if(!ms) return "never";
+  const m=Math.round((Date.now()-ms)/60000);
+  if(m<1) return "just now";
+  if(m<60) return m+" min ago";
+  const h=Math.round(m/60);
+  if(h<24) return h===1?"an hour ago":h+" hours ago";
+  const d=Math.round(h/24);
+  return d===1?"yesterday":d+" days ago";
+}
+
+// ============================================================================
 // CALENDAR
 // ============================================================================
-let eventFilter = "upcoming";
+const CAL_TABS = [["month","Month"],["agenda","Agenda"],["sources","Sources"]];
+let calTab = "month";
+let calMonth = null;          // first of the month on screen; null means this one
+let calPicked = null;         // the day selected in the grid
+
+const SRC_LOCAL    = "var(--accent)";
+const SRC_TRAINING = "var(--mac-protein)";
+
+/** Everything that happens on a day, from all three places it can come from:
+ *  events you typed, events Google holds, and training the program puts there.
+ *  Google events and training are read-only here — one lives in Google, the
+ *  other is derived from the week. */
+function calItems(from, to, trainingTo=to){
+  const out=[];
+  DB.get("events",[]).forEach(e=>{
+    if(!isDateKey(e.date) || e.date<from || e.date>to) return;
+    out.push({...e, source:"local", color:SRC_LOCAL});
+  });
+  gcalEvents().forEach(e=>{ if(e.date>=from && e.date<=to) out.push(e); });
+  for(let d=new Date(from+"T12:00:00"); todayKey(d)<=trainingTo; d.setDate(d.getDate()+1)){
+    trainingOn(todayKey(d)).forEach(t=>out.push({
+      id:t.id, source:"training", title:t.title, date:t.date, time:"",
+      color:SRC_TRAINING, done:t.done, routine:t.routine,
+    }));
+  }
+  return out.sort(calSort);
+}
+const calSort=(a,b)=> (a.date<b.date?-1:a.date>b.date?1:0)
+  || (a.time||"99:99").localeCompare(b.time||"99:99")
+  || String(a.title).localeCompare(String(b.title));
+
+const monthStart = d => new Date(d.getFullYear(), d.getMonth(), 1);
+const addMonths  = (d,n) => new Date(d.getFullYear(), d.getMonth()+n, 1);
 
 function renderCalendar(){
-  const all=DB.get("events",[]);
-  const scheduled=all.filter(e=>isDateKey(e.date));
-  const upcoming=scheduled.filter(e=>dayDelta(e.date)>=0);
-  const past=scheduled.filter(e=>dayDelta(e.date)<0);
-  const unscheduled=all.filter(e=>!isDateKey(e.date));
+  const today=todayKey();
+  const shown=calMonth ? new Date(calMonth+"T12:00:00") : monthStart(new Date());
+  if(!calPicked) calPicked=today;
 
-  const byTime=(a,b)=>dateSort(a.date)-dateSort(b.date)
-    || (a.time||"99:99").localeCompare(b.time||"99:99")
-    || String(a.title).localeCompare(String(b.title));
+  const todayCount=calItems(today,today).length;
+  const connected=gcalConnected();
 
-  // The program is part of what is coming up, so the week ahead of training
-  // shows alongside the events. It stops at seven days on purpose: the program
-  // repeats, and projecting it further would bury real events under it. These
-  // are derived from the week rather than stored, so they carry no edit or delete.
-  const training=[];
-  if(eventFilter!=="past"){
-    for(let i=0;i<7;i++){
-      const d=new Date(); d.setDate(d.getDate()+i);
-      trainingOn(todayKey(d)).forEach(t=>training.push(t));
-    }
-  }
-
-  let groups=[];
-  if(eventFilter==="past"){
-    groups=[{label:"Earlier", items:[...past].sort((a,b)=>byTime(b,a))}];
-  }else{
-    groups=BUCKETS.filter(b=>b.id!=="past"&&b.id!=="none")
-      .map(b=>({label:b.label, items:[
-        ...upcoming.filter(e=>bucketOf(e.date)===b.id),
-        ...training.filter(t=>bucketOf(t.date)===b.id),
-      ].sort(byTime)}));
-    if(eventFilter==="all") groups.push({label:"Earlier", items:[...past].sort((a,b)=>byTime(b,a))});
-    // Events carried over from before there was a date field keep their
-    // free-text "when" and sit in their own group rather than being guessed at.
-    groups.push({label:"Unscheduled", items:unscheduled});
-  }
-  groups=groups.filter(g=>g.items.length);
-  const shown=groups.reduce((a,g)=>a+g.items.length,0);
-  const next=upcoming.sort(byTime)[0];
-
-  $("#view-generic").innerHTML = `
-    <div class="grid cols-2">
-      <div class="panel">
-        <div class="section-title"><h2>Next up</h2><button class="primary" id="cal-add">Add event</button></div>
-        ${next ? `<p class="big">${esc(next.title)}</p>
-          <p class="muted" style="margin:2px 0 0">${esc(dateLabel(next.date))}${next.time?` · ${esc(next.time)}`:""}</p>`
-        : `<p class="empty">Nothing scheduled.</p>`}
+  const bar=`
+    <div class="panel foodbar">
+      <div class="foodbar-top">
+        <div>
+          <p class="eyebrow" style="margin:0">${esc(dateLabel(today).toUpperCase())}</p>
+          <p style="margin:4px 0 0;font-size:15px">${todayCount
+            ? `${todayCount} thing${todayCount===1?"":"s"} on today`
+            : `<span class="muted">Nothing on today</span>`}</p>
+        </div>
+        <div class="row" style="gap:10px;flex-wrap:wrap">
+          ${connected
+            ? `<button class="btn" id="cal-sync"${gcalBusy?" disabled":""}>${gcalBusy?"Syncing…":"Sync Google"}</button>`
+            : `<button class="btn" id="cal-connect">Connect Google</button>`}
+          <button class="primary" id="cal-add">Add event</button>
+        </div>
       </div>
-      <div class="panel">
-        <div class="section-title"><h2>Show</h2></div>
-        <div class="tabs" id="cal-tabs" role="tablist" aria-label="Which events to show"></div>
-      </div>
-    </div>
-
-    <div class="panel">
-      <div class="section-title"><h2>Events</h2><span class="tag">${shown} SHOWN</span></div>
-      ${groups.length ? groups.map(g=>`
-        <div class="group-head"><h3>${esc(g.label)}</h3><span class="meal-kcal">${g.items.length}</span></div>
-        ${g.items.map(e=>eventRow(e)).join("")}`).join("")
-        : `<p class="empty">${eventFilter==="past"?"Nothing has happened yet.":"Nothing scheduled. Add an event."}</p>`}
+      <div class="tabs" id="cal-tabs" role="tablist" aria-label="Calendar screens"></div>
     </div>`;
 
+  let body="";
+  if(calTab==="month")       body=calMonthView(shown, today);
+  else if(calTab==="agenda") body=calAgendaView(today);
+  else                       body=calSourcesView();
+
+  $("#view-generic").innerHTML = bar +
+    `<div id="cal-panel" role="tabpanel" aria-labelledby="cal-${calTab}">${body}</div>`;
+
   const tabs=$("#cal-tabs");
-  [["upcoming","Upcoming",upcoming.length+unscheduled.length+training.length],["past","Past",past.length],["all","All",all.length+training.length]]
-    .forEach(([id,label,n],i,arr)=>{
-      const b=document.createElement("button"); b.type="button"; b.id="cal-tab-"+id;
-      b.setAttribute("role","tab"); b.setAttribute("aria-controls","view-generic");
-      b.setAttribute("aria-selected", String(id===eventFilter));
-      b.tabIndex = id===eventFilter ? 0 : -1;
-      b.innerHTML=`${esc(label)}<span class="count">${n}</span>`;
-      b.onclick=()=>{ eventFilter=id; renderCalendar(); };
-      b.onkeydown=e=>{
-        let j=null;
-        if(e.key==="ArrowRight") j=(i+1)%arr.length;
-        else if(e.key==="ArrowLeft") j=(i-1+arr.length)%arr.length;
-        else if(e.key==="Home") j=0; else if(e.key==="End") j=arr.length-1;
-        if(j===null) return;
-        e.preventDefault(); eventFilter=arr[j][0]; renderCalendar(); $("#cal-tab-"+arr[j][0]).focus();
-      };
-      tabs.append(b);
-    });
+  CAL_TABS.forEach(([id,label],i)=>{
+    const b=document.createElement("button"); b.type="button"; b.id="cal-"+id;
+    b.setAttribute("role","tab"); b.setAttribute("aria-controls","cal-panel");
+    b.setAttribute("aria-selected", String(id===calTab));
+    b.tabIndex = id===calTab ? 0 : -1;
+    b.textContent=label;
+    b.onclick=()=>{ calTab=id; renderCalendar(); };
+    b.onkeydown=e=>{
+      let j=null;
+      if(e.key==="ArrowRight") j=(i+1)%CAL_TABS.length;
+      else if(e.key==="ArrowLeft") j=(i-1+CAL_TABS.length)%CAL_TABS.length;
+      else if(e.key==="Home") j=0; else if(e.key==="End") j=CAL_TABS.length-1;
+      if(j===null) return;
+      e.preventDefault(); calTab=CAL_TABS[j][0]; renderCalendar(); $("#cal-"+calTab).focus();
+    };
+    tabs.append(b);
+  });
 
-  $("#cal-add").onclick=()=>openEvent();
-  wireListRows("#view-generic", "events", renderCalendar, openEvent);
+  $("#cal-add").onclick=()=>openEvent(null, calTab==="month"?calPicked:null);
+  gcalAutoSync();
+  if($("#cal-connect")) $("#cal-connect").onclick=()=>gcalConfigured() ? gcalRefresh() : (calTab="sources", renderCalendar());
+  if($("#cal-sync"))    $("#cal-sync").onclick=()=>gcalRefresh();
+  wireCalendar();
 }
 
+// ---- Month --------------------------------------------------------------
+function calMonthView(shown, today){
+  // Six rows always: the grid keeps its height as you page through months
+  // rather than jumping about.
+  const first=monthStart(shown);
+  const gridStart=new Date(first); gridStart.setDate(1-first.getDay());
+  const days=[...Array(42)].map((_,i)=>{ const d=new Date(gridStart); d.setDate(gridStart.getDate()+i); return d; });
+  const from=todayKey(days[0]), to=todayKey(days[41]);
+
+  const byDay={};
+  calItems(from,to).forEach(e=>(byDay[e.date]=byDay[e.date]||[]).push(e));
+
+  const dow=["S","M","T","W","T","F","S"];
+  const picked=calItems(calPicked, calPicked);
+
+  return `
+    <div class="grid cols-2">
+      <div class="panel">
+        <div class="cal-head">
+          <h2>${esc(first.toLocaleDateString(undefined,{month:"long",year:"numeric"}))}</h2>
+          <div class="cal-nav">
+            <button type="button" id="cal-prev" aria-label="Previous month"><span style="display:grid;transform:rotate(90deg)">${icon("chevron")}</span></button>
+            <button type="button" class="wide" id="cal-today">Today</button>
+            <button type="button" id="cal-next" aria-label="Next month"><span style="display:grid;transform:rotate(-90deg)">${icon("chevron")}</span></button>
+          </div>
+        </div>
+        <div class="cal-grid" role="grid" aria-label="Month">
+          ${dow.map(d=>`<div class="cal-dow" aria-hidden="true">${d}</div>`).join("")}
+          ${days.map(d=>{
+            const k=todayKey(d);
+            const items=byDay[k]||[];
+            const out=d.getMonth()!==first.getMonth();
+            return `<button type="button" class="cal-day${out?" out":""}${k===today?" today":""}"
+              data-day="${k}" aria-pressed="${k===calPicked}"
+              aria-label="${esc(d.toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"}))}, ${items.length} item${items.length===1?"":"s"}">
+              <span class="n">${d.getDate()}</span>
+              ${items.length?`<span class="cal-dots">
+                ${items.slice(0,4).map(e=>`<span class="cal-dot" style="background:${esc(e.color)};${e.done?"opacity:.4":""}"></span>`).join("")}
+                ${items.length>4?`<span class="cal-more">+${items.length-4}</span>`:""}
+              </span>`:""}
+            </button>`;
+          }).join("")}
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="section-title">
+          <h2>${esc(dateLabel(calPicked) || calPicked)}</h2>
+          <span class="tag">${picked.length} ITEM${picked.length===1?"":"S"}</span>
+        </div>
+        <p class="muted" style="margin:-4px 0 10px;font-size:13px">${esc(
+          new Date(calPicked+"T12:00:00").toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"}))}</p>
+        ${picked.length ? picked.map(eventRow).join("") : `<p class="empty">Nothing on this day.</p>`}
+      </div>
+    </div>`;
+}
+
+// ---- Agenda -------------------------------------------------------------
+function calAgendaView(today){
+  const to=todayKey(new Date(Date.now()+GCAL_FWD*864e5));
+  // The program repeats, so a week of it is the useful part of it here.
+  const items=calItems(today, to, todayKey(new Date(Date.now()+6*864e5)));
+  const groups=BUCKETS.filter(b=>b.id!=="past"&&b.id!=="none")
+    .map(b=>({label:b.label, items:items.filter(e=>bucketOf(e.date)===b.id)}))
+    .filter(g=>g.items.length);
+  // Events that predate the date field keep their free text and sit apart
+  // rather than being given a day they never had.
+  const undated=DB.get("events",[]).filter(e=>!isDateKey(e.date))
+    .map(e=>({...e, source:"local", color:SRC_LOCAL}));
+
+  return `
+    <div class="panel">
+      <div class="section-title"><h2>What's coming</h2><span class="tag">${items.length} AHEAD</span></div>
+      ${groups.length ? groups.map(g=>`
+        <div class="group-head"><h3>${esc(g.label)}</h3><span class="meal-kcal">${g.items.length}</span></div>
+        ${g.items.map(eventRow).join("")}`).join("")
+        : `<p class="empty">Nothing scheduled. Add an event, or connect Google.</p>`}
+      ${undated.length?`<div class="group-head"><h3>Unscheduled</h3><span class="meal-kcal">${undated.length}</span></div>
+        ${undated.map(eventRow).join("")}`:""}
+    </div>`;
+}
+
+// ---- Sources ------------------------------------------------------------
+function calSourcesView(){
+  const cals=gcalCalendars(), hidden=gcalHidden();
+  const connected=gcalConnected();
+  return `
+    <div class="panel">
+      <div class="section-title"><h2>Google Calendar</h2>
+        <span class="tag">${connected?"CONNECTED":"NOT CONNECTED"}</span></div>
+      ${gcalError?`<p class="note" style="border-color:var(--danger);color:#ffb3c4">${esc(gcalError)}</p>`:""}
+      ${(!gcalConfigured() || gcalEditingId) ? `
+        <p class="muted" style="font-size:13.5px;margin:6px 0 0">
+          Google needs a client ID for this site before it will hand over a calendar. Making one is
+          free and takes a couple of minutes — the ID is public by design, so it is safe to paste here.</p>
+        <label for="gc-id" style="margin-top:12px">Google OAuth client ID</label>
+        <input id="gc-id" value="${esc(gcalClientId())}" placeholder="1234567890-abcdef.apps.googleusercontent.com" autocomplete="off"/>
+        <div class="row" style="gap:10px;margin-top:12px">
+          <button class="primary" id="gc-save">Save and connect</button>
+          ${gcalEditingId?`<button class="btn" id="gc-cancel">Cancel</button>`:""}
+        </div>
+        <details class="how">
+          <summary>How to get one</summary>
+          <ol>
+            <li>Open <span class="mono">console.cloud.google.com</span> and make a project (any name).</li>
+            <li>APIs &amp; Services → Library → enable <b>Google Calendar API</b>.</li>
+            <li>APIs &amp; Services → OAuth consent screen → <b>External</b>, fill in the name and
+                your email, and add yourself under <b>Test users</b>.</li>
+            <li>Credentials → Create credentials → <b>OAuth client ID</b> → <b>Web application</b>.</li>
+            <li>Under <b>Authorised JavaScript origins</b> add exactly:
+                <span class="mono">${esc(location.origin)}</span></li>
+            <li>Create, then copy the client ID and paste it above.</li>
+          </ol>
+          <p>Because the app stays in Testing, Google shows an "unverified app" screen the first
+             time. That is expected for something only you use — carry on past it.</p>
+        </details>
+        <p class="note">Sign-in happens in your browser and the calendar is only ever read, never
+          changed. Nothing is sent to a server — this page has no back end to send it to.</p>
+      ` : `
+        <p class="muted" style="font-size:13.5px;margin:6px 0 0">
+          ${connected
+            ? `Last synced ${esc(agoLabel(gcalSyncedAt()))} · ${gcalEvents().length} events held on this device.`
+            : `A client ID is saved. Connect to pull the calendar in.`}</p>
+        <div class="row" style="gap:10px;margin-top:12px;flex-wrap:wrap">
+          <button class="primary" id="gc-sync"${gcalBusy?" disabled":""}>${gcalBusy?"Syncing…":connected?"Sync now":"Connect"}</button>
+          <button class="btn" id="gc-edit">Change client ID</button>
+          ${connected?`<button class="btn" id="gc-out">Disconnect</button>`:""}
+        </div>
+        ${!gcalToken()&&connected?`<p class="note">The sign-in token expires with the browser tab, so the
+          first sync after reopening the dashboard asks Google again. The events below stay put in the meantime.</p>`:""}
+      `}
+    </div>
+
+    ${cals.length?`
+    <div class="panel">
+      <div class="section-title"><h2>Your calendars</h2><span class="tag">${cals.length-hidden.size} SHOWN</span></div>
+      <p class="muted" style="font-size:13px;margin:-4px 0 8px">Switch one off and the next sync leaves it out.</p>
+      ${cals.map(c=>`
+        <div class="srcline">
+          <span class="sw" style="background:${esc(c.color)}"></span>
+          <span class="nm">${esc(c.name)}${c.primary?` <span class="faint">· main</span>`:""}</span>
+          <button type="button" class="chip${hidden.has(c.id)?"":" on"}" data-cal="${esc(c.id)}"
+            aria-pressed="${!hidden.has(c.id)}">${hidden.has(c.id)?"Hidden":"Shown"}</button>
+        </div>`).join("")}
+    </div>`:""}
+
+    <div class="panel">
+      <div class="section-title"><h2>What the colours mean</h2></div>
+      <div class="srcline"><span class="sw" style="background:${SRC_LOCAL}"></span>
+        <span class="nm">Events you add here</span><span class="faint">editable</span></div>
+      <div class="srcline"><span class="sw" style="background:${SRC_TRAINING}"></span>
+        <span class="nm">Training from your program</span><span class="faint">Fitness → Program</span></div>
+      ${cals.filter(c=>!hidden.has(c.id)).map(c=>`
+        <div class="srcline"><span class="sw" style="background:${esc(c.color)}"></span>
+          <span class="nm">${esc(c.name)}</span><span class="faint">Google</span></div>`).join("")}
+    </div>`;
+}
+
+// ---- Wiring -------------------------------------------------------------
+function wireCalendar(){
+  const host=$("#view-generic");
+  host.querySelectorAll("[data-day]").forEach(b=>b.onclick=()=>{ calPicked=b.dataset.day; renderCalendar(); });
+  if($("#cal-prev")) $("#cal-prev").onclick=()=>{ calMonth=todayKey(addMonths(calMonth?new Date(calMonth+"T12:00:00"):new Date(),-1)); renderCalendar(); };
+  if($("#cal-next")) $("#cal-next").onclick=()=>{ calMonth=todayKey(addMonths(calMonth?new Date(calMonth+"T12:00:00"):new Date(), 1)); renderCalendar(); };
+  if($("#cal-today")) $("#cal-today").onclick=()=>{ calMonth=null; calPicked=todayKey(); renderCalendar(); };
+
+  if($("#gc-save")) $("#gc-save").onclick=()=>{
+    const v=$("#gc-id").value.trim();
+    if(!v){ $("#gc-id").focus(); return; }
+    const changed = v!==gcalClientId();
+    DB.set("gcalClientId", v); gcalEditingId=false; gcalError="";
+    // A different ID means a different grant, so the old token is no good.
+    if(changed) clearGcalToken();
+    gcalRefresh();
+  };
+  if($("#gc-sync")) $("#gc-sync").onclick=()=>gcalRefresh();
+  if($("#gc-out"))  $("#gc-out").onclick=()=>gcalDisconnect();
+  // Changing the ID must not throw the old one away before a new one is typed.
+  if($("#gc-edit"))   $("#gc-edit").onclick=()=>{ gcalEditingId=true; gcalError=""; renderCalendar(); };
+  if($("#gc-cancel")) $("#gc-cancel").onclick=()=>{ gcalEditingId=false; renderCalendar(); };
+  host.querySelectorAll("[data-cal]").forEach(b=>b.onclick=()=>{
+    const h=gcalHidden(); const id=b.dataset.cal;
+    h.has(id) ? h.delete(id) : h.add(id);
+    DB.set("gcalHidden",[...h]);
+    // Hiding one has to drop its events too, or they linger until a sync.
+    const c=gcalCache();
+    if(c) DB.set("gcalCache", {at:c.at, events:c.events.filter(e=>!h.has(e.calendarId))});
+    renderCalendar();
+  });
+
+  host.querySelectorAll("[data-edit-id]").forEach(b=>b.onclick=()=>
+    openEvent(DB.get("events",[]).find(x=>x.id===b.dataset.editId)));
+  host.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{
+    DB.set("events", DB.get("events",[]).filter(x=>x.id!==b.dataset.del));
+    renderCalendar(); toast("Deleted");
+  });
+}
+
+/** One row, whatever the source. The colour bar carries where it came from,
+ *  so the list reads as one calendar rather than three stacked ones. */
 function eventRow(e){
-  if(e.kind==="training") return trainingRow(e);
-  const label=dateLabel(e.date);
-  const now=e.date===todayKey();
-  const when = label ? label + (e.time?` · ${e.time}`:"") : (e.when || "");
-  return `<div class="entry">
-    <div class="body">
+  const when = e.time ? e.time
+    : e.allDay ? "all day"
+    : e.source==="training" ? "program"
+    : "any time";
+  const meta = e.source==="google" ? e.calendar
+             : e.source==="training" ? `${kindLabel(e.routine.kind)} · from your program${e.done?" · done":""}`
+             : (e.when && !isDateKey(e.date)) ? e.when : "";
+  const sub = [meta, e.location].filter(Boolean).join(" · ");
+  return `<div class="ev${e.done?" done":""}">
+    <span class="when"><b>${esc(when.toUpperCase())}</b>${e.endTime?`<i>${esc(e.endTime)}</i>`:""}</span>
+    <span class="bar" style="background:${esc(e.color||SRC_LOCAL)}${e.done?";opacity:.4":""}"></span>
+    <span class="body">
       <strong>${esc(e.title)}</strong>
-      ${e.notes?`<p>${esc(e.notes)}</p>`:""}
-    </div>
-    ${when?`<span class="due${now?" now":""}">${esc(when.toUpperCase())}</span>`:""}
-    <button type="button" class="del" data-edit-id="${esc(e.id)}" aria-label="Edit ${esc(e.title)}">${icon("edit")}</button>
-    <button type="button" class="del" data-del="${esc(e.id)}" aria-label="Delete ${esc(e.title)}">${icon("x")}</button>
-  </div>`;
-}
-
-/** Training from the weekly program: shown, not editable, and ticked off when
- *  a matching session has actually been logged that day. */
-function trainingRow(t){
-  const label=dateLabel(t.date);
-  const now=t.date===todayKey();
-  return `<div class="entry"${t.done?' style="opacity:.6"':""}>
-    <span class="upnext-ic" title="Training">${icon("fitness")}</span>
-    <div class="body">
-      <strong style="${t.done?'text-decoration:line-through;color:var(--muted)':''}">${esc(t.title)}</strong>
-      <small>${esc(kindLabel(t.routine.kind))} · from your program${t.done?" · done":""}</small>
-    </div>
-    ${label?`<span class="due${now?" now":""}">${esc(label.toUpperCase())}</span>`:""}
+      ${sub?`<small>${esc(sub)}</small>`:""}
+      ${e.notes?`<p>${esc(e.notes.length>180?e.notes.slice(0,180)+"…":e.notes)}</p>`:""}
+    </span>
+    ${e.source==="local"?`<span class="acts">
+      <button type="button" class="del" data-edit-id="${esc(e.id)}" aria-label="Edit ${esc(e.title)}">${icon("edit")}</button>
+      <button type="button" class="del" data-del="${esc(e.id)}" aria-label="Delete ${esc(e.title)}">${icon("x")}</button>
+    </span>`:""}
   </div>`;
 }
 
@@ -3226,8 +3689,8 @@ function openTask(existing){
 }
 
 // ---- Event capture ----
-function openEvent(existing){
-  const ev=existing||{};
+function openEvent(existing, presetDate){
+  const ev=existing||(isDateKey(presetDate)?{date:presetDate}:{});
   $("#entry-title").textContent = existing ? "Edit event" : "Add event";
   $("#entry-fields").innerHTML=`
     <label for="ev-title">Event</label><input id="ev-title" value="${esc(ev.title||"")}"/>
@@ -3262,7 +3725,7 @@ function openEvent(existing){
     if(i>=0) l[i]=rec; else l.unshift(rec);
     DB.set("events",l);
     $("#entry-dialog").close(); toast(existing?"Event updated":"Event added");
-    if(current==="Calendar") renderCalendar(); else if(current==="Command") renderCommand();
+    redrawCalendarish();
   };
   openDialog($("#entry-dialog")); setTimeout(()=>$("#ev-title").focus(),40);
 }

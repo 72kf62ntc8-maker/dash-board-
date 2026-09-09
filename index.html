@@ -5,6 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#08060A" />
 <title>Chaston's Dashboard</title>
+<link rel="manifest" href="/manifest.webmanifest" />
+<link rel="icon" href="/icons/icon-192.png" type="image/png" />
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Chaston" />
+<meta name="mobile-web-app-capable" content="yes" />
 <!--
   Chaston's Dashboard — a self-contained personal command center.
 
@@ -843,6 +850,10 @@ const $ = s=>document.querySelector(s);
 // ============================================================================
 const ICONS = {
   command:  '<path d="m12 2.5 8.2 4.75v9.5L12 21.5 3.8 16.75v-9.5Z"/><circle cx="12" cy="12" r="2.6"/>',
+  moon:     '<path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z"/>',
+  download: '<path d="M12 4v11m0 0-4-4m4 4 4-4M5 19h14"/>',
+  upload:   '<path d="M12 15V4m0 0L8 8m4-4 4 4M5 19h14"/>',
+  trophy:   '<path d="M7 4h10v5a5 5 0 0 1-10 0V4ZM7 6H4.5a2.5 2.5 0 0 0 2.5 4M17 6h2.5a2.5 2.5 0 0 1-2.5 4M12 14v3m-4 3h8"/>',
   fitness:  '<path d="M4.5 9.5v5M7.5 7v10M16.5 7v10M19.5 9.5v5M7.5 12h9"/>',
   steps:    '<path d="M3 20h4.5v-4.5H12V11h4.5V6.5H21"/>',
   food:     '<path d="M12 8.2C11 6.1 9 5 7.2 5.9 5.1 6.9 4.3 9.7 5.3 12.9c.9 3 2.9 6.1 4.6 6.1.8 0 1.3-.4 2.1-.4s1.3.4 2.1.4c1.7 0 3.7-3.1 4.6-6.1 1-3.2.2-6-1.9-7C15 5 13 6.1 12 8.2Z"/><path d="M12 8.2V5.4c0-1.2 1-2.2 2.2-2.2"/>',
@@ -1743,11 +1754,25 @@ function trainingOn(dayKey){
 
 /** Estimated 1RM, Epley. Honest up to about ten reps and drifts optimistic
  *  above that, so it is called an estimate everywhere it appears. */
+// A set is "185x8". "185x8+2" is 185 for 8 clean reps, then 2 partials after
+// form broke. Partials are kept and shown, but they are not reps: the 1RM
+// estimate and the volume count only the clean ones, and a set that ends in
+// partials is by definition a set taken to failure — which is what the
+// overload hint reads from it.
+const SET_RE = /(\d+(?:\.\d+)?)\s*[x×]\s*(\d+)(?:\s*\+\s*(\d+))?/gi;
+function parseSets(v){
+  return [...String(v||"").matchAll(SET_RE)].map(m=>{
+    const set={weight:+m[1], reps:+m[2]};
+    if(m[3] && +m[3]>0) set.partials=+m[3];
+    return set;
+  });
+}
 const e1RM = (w,r) => (+w||0) * (1 + (+r||0)/30);
 const setVolume = sets => (sets||[]).reduce((a,x)=>a+(+x.weight||0)*(+x.reps||0),0);
 const bestSet = sets => (sets||[]).reduce((b,x)=>(!b||e1RM(x.weight,x.reps)>e1RM(b.weight,b.reps))?x:b, null);
-const fmtSet = x => x ? `${nfmt(x.weight)}×${x.reps}` : "—";
+const fmtSet = x => x ? `${nfmt(x.weight)}×${x.reps}${x.partials?`+${x.partials}`:""}` : "—";
 const fmtSets = sets => (sets||[]).map(fmtSet).join(", ");
+const toFailure = sets => (sets||[]).some(x=>x.partials>0);
 
 /** Every session that included this exercise, newest first. */
 function exerciseHistory(name){
@@ -1793,6 +1818,14 @@ function overloadHint(exercise, stats){
   const sets=stats.last.sets;
   if(!isFinite(target) || !sets.length) return `Last time: ${fmtSets(sets)}. Beat it.`;
   const allHit=sets.every(x=>(+x.reps||0)>=target) && sets.length>=(+exercise.sets||sets.length);
+  if(toFailure(sets)){
+    // Partials mean the set ended where clean form did. Hitting the target
+    // and then grinding past it is a green light; falling short of it is not.
+    const last=sets[sets.length-1];
+    return allHit
+      ? `Last time: ${fmtSets(sets)} — every rep, then partials past it. Add weight.`
+      : `Last time: ${fmtSets(sets)} — form broke at ${last.reps}. Hold the weight and get ${Math.min(target, last.reps+1)} clean.`;
+  }
   return allHit
     ? `Last time you hit every rep (${fmtSets(sets)}) — add weight.`
     : `Last time: ${fmtSets(sets)}. Repeat the weight and chase ${target} reps.`;
@@ -1858,6 +1891,17 @@ const DEFAULT_STEP_GOAL = 15000;
 const getStepGoal = ()=>DB.get("stepGoal", DEFAULT_STEP_GOAL);
 const getSteps = ()=>DB.get("steps", {});
 function setSteps(dateKey, count){ const s=getSteps(); s[dateKey]=count; DB.set("steps",s); }
+
+// ---- Sleep: hours, one number a day, keyed to the morning you woke up -------
+const getSleep = ()=>DB.get("sleep", {});
+function setSleep(dateKey, hours){ const s=getSleep(); s[dateKey]=hours; DB.set("sleep",s); }
+/** Average over the last n days that have an entry; null when none do. */
+function sleepAvg(n=7, endDay=todayKey()){
+  const s=getSleep(); const vals=[];
+  for(let i=0;i<n;i++){ const d=new Date(endDay+"T12:00:00"); d.setDate(d.getDate()-i);
+    const v=+s[todayKey(d)]; if(v>0) vals.push(v); }
+  return vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : null;
+}
 /** The last `n` days, oldest first, as [{date,count}]. */
 function stepDays(n=7, endKey){
   const out=[]; const s=getSteps(); const c=endKey?new Date(endKey+"T12:00:00"):new Date();
@@ -1875,14 +1919,69 @@ function stepDays(n=7, endKey){
  */
 function ingestStepsFromUrl(){
   const q=new URLSearchParams(location.search);
-  const raw=q.get("steps"); if(raw===null) return null;
-  const n=Math.round(parseFloat(raw));
-  // Reject nonsense rather than writing a bogus day.
-  if(!isFinite(n)||n<0||n>200000) return null;
   const day=/^\d{4}-\d{2}-\d{2}$/.test(q.get("date")||"") ? q.get("date") : todayKey();
-  setSteps(day,n);
-  try{ history.replaceState({},"",location.pathname); }catch(e){}
-  return {day,n};
+  let got=null;
+  if(q.get("steps")!==null){
+    const n=Math.round(parseFloat(q.get("steps")));
+    // Reject nonsense rather than writing a bogus day.
+    if(isFinite(n)&&n>=0&&n<=200000){ setSteps(day,n); got={kind:"steps",day,n}; }
+  }
+  // Sleep rides the same road: ?sleep=7.5 from a Shortcut reading Health.
+  if(q.get("sleep")!==null){
+    const h=Math.round(parseFloat(q.get("sleep"))*10)/10;
+    if(isFinite(h)&&h>0&&h<=24){ setSleep(day,h); got=got||{kind:"sleep",day,n:h}; }
+  }
+  if(got) try{ history.replaceState({},"",location.pathname); }catch(e){}
+  return got;
+}
+
+/**
+ * Maintenance calories, from your own numbers rather than a formula. Over the
+ * last 28 days, take the trend weight at each end, the average intake on the
+ * days you actually logged food, and the fact that a pound is ~3,500 kcal:
+ *   maintenance ≈ average intake − (weight change × 3500 / days)
+ * Losing on 2,200 means maintenance is above 2,200; the trend says by how
+ * much. It needs enough days to be worth saying — two weeks of trend and ten
+ * logged days — and says what it still needs until then.
+ */
+function estimateMaintenance(){
+  const weigh=DB.get("weighins",{}); const foodLog=DB.get("foodLog",{});
+  const trend=computeTrend(weightSeries(weigh));
+  const end=todayKey(); const start=todayKey(new Date(Date.now()-28*864e5));
+  const win=trend.filter(p=>p.date>=start && p.date<=end);
+  const logged=Object.keys(foodLog).filter(d=>d>=start && d<=end && (foodLog[d]||[]).length)
+    .map(d=>foodTotals(foodLog[d]).calories).filter(c=>c>0);
+  if(win.length<2) return {need:"two weeks of weigh-ins"};
+  const days=(new Date(win[win.length-1].date)-new Date(win[0].date))/864e5;
+  if(days<14) return {need:`${Math.ceil(14-days)} more days of weigh-ins`};
+  if(logged.length<10) return {need:`${10-logged.length} more logged food days`};
+  const avgIntake=logged.reduce((a,b)=>a+b,0)/logged.length;
+  const deltaLb=win[win.length-1].trend-win[0].trend;
+  const kcal=Math.round((avgIntake - deltaLb*3500/days)/10)*10;
+  return {kcal, days:Math.round(days), logged:logged.length, avgIntake:Math.round(avgIntake),
+          ratePerWeek:deltaLb/days*7};
+}
+
+/**
+ * The carb cycle, planned against eaten, for the last n days. A day counts as
+ * on target when it was logged and both calories and carbs landed within
+ * tolerance of what that day type asked for. Unlogged days are not misses —
+ * they are unknowns, and are said so.
+ */
+function carbActuals(n=7, endDay=todayKey()){
+  const foodLog=DB.get("foodLog",{}); const types=getDayTypes(); const rows=[];
+  for(let i=n-1;i>=0;i--){
+    const d=new Date(endDay+"T12:00:00"); d.setDate(d.getDate()-i); const k=todayKey(d);
+    const type=dayTypeFor(k); const t=getTargets(k);
+    const items=foodLog[k]||[]; const a=foodTotals(items);
+    const logged=items.length>0;
+    const calOk = logged && Math.abs(a.calories-t.calories) <= Math.max(150, t.calories*0.10);
+    const carbOk= logged && Math.abs(a.carbs-t.carbs)       <= Math.max(25,  t.carbs*0.20);
+    rows.push({day:k, label:DAY_LABELS[dayIdx(d)], type, typeLabel:type?types[type].label:"",
+      target:t, actual:a, logged, onTarget:calOk&&carbOk, calOk, carbOk,
+      isToday:k===endDay});
+  }
+  return rows;
 }
 
 // ---- The coach: rules over food + lifts + mat + weight ----
@@ -1941,6 +2040,37 @@ function runCoach(){
     out.push([`High day with ${Math.round(t.carbs-totals.carbs)}g of carbs still to go — fuel it.`,"warn"]);
   if(dt==="low" && totals.carbs > t.carbs+40)
     out.push([`Low day, but ${Math.round(totals.carbs-t.carbs)}g over on carbs.`,"warn"]);
+  // Yesterday's cycle day, as eaten. Today is still being eaten, so it is the
+  // finished day that gets judged; the week's adherence rides underneath.
+  if(carbCycleOn()){
+    const rows=carbActuals(8).slice(0,7);           // the seven finished days
+    const y=rows[rows.length-1];
+    if(y && y.logged && y.type && !y.onTarget){
+      const over=y.actual.calories-y.target.calories;
+      out.push([`Yesterday was a ${y.typeLabel.toLowerCase()} day — ${Math.round(y.actual.calories).toLocaleString()} against ${y.target.calories.toLocaleString()} (${over>0?"+":"−"}${Math.abs(Math.round(over)).toLocaleString()}).`,"warn"]);
+    }
+    const judged=rows.filter(r=>r.logged&&r.type);
+    if(judged.length>=3){
+      const hit=judged.filter(r=>r.onTarget).length;
+      out.push([`Carb cycle: ${hit} of ${judged.length} logged days on target this week.`, hit/judged.length>=0.7?"good":"warn"]);
+    }
+  }
+  // Sleep. Short last night and something hard on the program is the pairing
+  // worth naming; a short week is its own line.
+  const sleptToday=+getSleep()[day]||0;
+  const hardPlanned=pt.some(r=>r.kind==="lift"||r.kind==="plyo"||r.kind==="conditioning");
+  if(sleptToday>0 && sleptToday<6 && hardPlanned && !trainedToday)
+    out.push([`Slept ${sleptToday}h — make today's session technical, not maximal.`,"warn"]);
+  else if(sleptToday>0 && sleptToday<6)
+    out.push([`Slept ${sleptToday}h last night.`,"warn"]);
+  const sAvg=sleepAvg(7);
+  if(sAvg!=null && sAvg<6.5 && Object.keys(getSleep()).length>=4)
+    out.push([`Averaging ${sAvg.toFixed(1)}h of sleep this week — recovery is behind the training.`,"warn"]);
+  // A backup that is going stale, once there is something worth losing.
+  const stores=Object.keys(backupPayload().data).length;
+  const age=backupAgeDays();
+  if(stores>=3 && (age===null || age>=14))
+    out.push([age===null ? "No backup yet — everything here lives in this browser only." : `Last backup ${age} days ago.`, "warn"]);
   // Fuel a mat day
   const matMin=mma.filter(s=>todayKey(new Date(s.date))===day).reduce((a,s)=>a+(+s.minutes||0),0);
   if(matMin>=45 && totals.protein < t.protein-10) out.push([`${matMin} min on the mat today — still ${Math.round(t.protein-totals.protein)}g of protein to go.`,"warn"]);
@@ -1992,7 +2122,7 @@ const OB = (()=>{
     const name=sp[1].trim().replace(/[:\-—]+$/,"").trim(); if(name.length<2) return null; const rest=sp[2];
     const at=rest.match(/^(\d+)\s*[x×]\s*(\d+)\s*@\s*(\d+(?:\.\d+)?)/i);
     if(at){ const n=+at[1]; if(n>0&&n<=20) return {name,sets:Array.from({length:n},()=>({weight:+at[3],reps:+at[2]}))}; }
-    const sets=[]; const re=/(\d+(?:\.\d+)?)\s*[x×]\s*(\d+)/gi; let m; while((m=re.exec(rest))) sets.push({weight:+m[1],reps:+m[2]});
+    const sets=parseSets(rest);
     return sets.length?{name,sets}:null;
   }
   const P={calories:/(\d+(?:\.\d+)?)\s*(?:kcal|cal(?:ories)?)\b/i,protein:/(\d+(?:\.\d+)?)\s*g?\s*(?:p\b|protein)/i,carbs:/(\d+(?:\.\d+)?)\s*g?\s*(?:c\b|carbs?)/i,fat:/(\d+(?:\.\d+)?)\s*g?\s*(?:f\b|fat)/i};
@@ -2097,9 +2227,12 @@ const ACTIONS = [
   {label:"Log Session", module:"Fitness",   icon:"session",   group:"Personal", desc:"Mat, plyo or conditioning"},
   {label:"Log Weight",  module:"Fitness",   icon:"weight",    group:"Personal", desc:"One number, once a day"},
   {label:"Log Steps",   module:"Steps",     icon:"steps",     group:"Personal", desc:"Today against your goal"},
+  {label:"Log Sleep",   module:"Fitness",   icon:"moon",      group:"Personal", desc:"Hours, keyed to this morning"},
   {label:"Journal",     module:"Journal",   icon:"pen",       group:"Personal", desc:"Write the day down"},
   {label:"Add Task",    module:"Planner",   icon:"plus",      group:"Planning", desc:"Something to get done"},
   {label:"Add Event",   module:"Calendar",  icon:"calendar",  group:"Planning", desc:"Put it on the schedule"},
+  {label:"Back Up",     module:"Command",   icon:"download",  group:"Planning", desc:"Every store to one file"},
+  {label:"Restore",     module:"Command",   icon:"upload",    group:"Planning", desc:"Bring a backup file back"},
   {label:"Log Sale",    module:"Reselling", icon:"reselling", group:"Business", desc:"Record what sold"},
   {label:"Add Expense", module:"Money",     icon:"dollar",    group:"Business", desc:"Money going out"},
 ];
@@ -2327,6 +2460,7 @@ function renderCommand(){
       ${st(totals.protein>=t.protein?"ok":totals.protein?"":"off","Protein",`${Math.round(totals.protein)}g`)}
       ${st(water>=waterGoal?"ok":water?"":"off","Water",`${Math.round(water/wu.per)} ${wu.label}`)}
       ${training.length?st(doneToday>=training.length?"ok":"","Training",doneToday>=training.length?"done":`${doneToday}/${training.length}`):st("off","Training","rest")}
+      ${(()=>{ const h=+getSleep()[day]||0; return st(h>=7?"ok":h?"":"off","Sleep",h?`${h}h`:"—"); })()}
       ${overdue?st("","Overdue",`${overdue}`):""}
       ${dt?st("","Cycle",getDayTypes()[dt].label):""}
       ${gcalConnected()?st("ok","Google","synced"):""}
@@ -2506,6 +2640,9 @@ function runAction(a){
   if(a.label==="Log Session"){ show("Fitness"); openMat(); return; }
   if(a.label==="Log Weight"){ show("Fitness"); openWeight(); return; }
   if(a.label==="Log Steps"){ show("Steps"); openSteps(); return; }
+  if(a.label==="Log Sleep"){ openSleep(); return; }
+  if(a.label==="Back Up"){ exportBackup(); return; }
+  if(a.label==="Restore"){ importBackup(); return; }
   const g=GENERIC[a.module]; if(g){ show(a.module); openEntry(a.module); }
 }
 
@@ -2594,6 +2731,7 @@ function renderFitness(){
   if(fitTab==="history"){
     $("#f-weight").onclick=openWeight;
     $("#f-obsidian").onclick=openObsidian;
+    if($("#f-sleep")) $("#f-sleep").onclick=openSleep;
   }
 }
 
@@ -2691,12 +2829,27 @@ function fitProgress(){
     <div class="section-title"><h2>Progressive overload</h2></div>
     <p class="empty">Log a lift and this starts tracking it — last session, best set, and whether you moved forward.</p></div>`;
   const rows=names.map(n=>({name:n, st:exerciseStats(n)})).filter(x=>x.st);
+  const board=rows.filter(x=>x.st.pr).map(x=>({name:x.name, pr:x.st.pr, date:x.st.prDate, heaviest:x.st.heaviest,
+    e1:e1RM(x.st.pr.weight,x.st.pr.reps)})).sort((a,b)=>b.e1-a.e1);
   return `
+    <div class="panel">
+      <div class="section-title"><h2>${icon("trophy")} PR board</h2><span class="tag">${board.length} LIFT${board.length===1?"":"S"}</span></div>
+      <div class="ctrls" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">
+        ${board.map(b=>`<div class="ctrl" style="aspect-ratio:auto;min-height:0;cursor:default">
+          <span class="m-key">${esc(b.name)}</span>
+          <span class="n-big" style="font-size:24px;margin-top:2px">${nfmt(b.e1)}<span class="n-u">e1RM</span></span>
+          <b style="margin-top:2px;font-weight:500;color:var(--muted)">${esc(fmtSet(b.pr))}${b.heaviest>b.pr.weight?` · ${nfmt(b.heaviest)} heaviest`:""}</b>
+          <span class="m-meta">${b.date?esc(new Date(b.date).toLocaleDateString(undefined,{month:"short",day:"numeric",year:"2-digit"})):""}</span>
+        </div>`).join("")}
+      </div>
+    </div>
+
     <div class="panel">
       <div class="section-title"><h2>Progressive overload</h2><span class="tag">${rows.length} EXERCISE${rows.length===1?"":"S"}</span></div>
       <p class="muted" style="font-size:13.5px;margin:0 0 6px">
         Best set is the heaviest by estimated 1RM (Epley), which is an estimate and drifts optimistic past about ten reps.
-        Volume is weight × reps across the session.
+        Volume is weight × reps across the session. A <code>+2</code> on a set is partials after clean reps ran out —
+        shown, but not counted as reps.
       </p>
       ${rows.map(({name,st})=>{
         const d=st.volumeDelta;
@@ -2723,18 +2876,41 @@ function fitHistory(mma, lifts){
   const trendSeries=computeTrend(weightSeries(weigh));
   const trendWeight=trendSeries.length?trendSeries[trendSeries.length-1].trend:null;
   const rate=weeklyRate(trendSeries);
+  const m=estimateMaintenance();
+  const sl=getSleep(); const slDays=[...Array(14)].map((_,i)=>{ const d=new Date(); d.setDate(d.getDate()-13+i);
+    const k=todayKey(d); return {k, label:DAY_LABELS[dayIdx(d)][0], h:+sl[k]||0}; });
+  const slMax=Math.max(9, ...slDays.map(x=>x.h));
+  const sAvg=sleepAvg(7), lastNight=+sl[todayKey()]||0;
   return `
-    <div class="bento"><div class="panel c5 r2">
+    <div class="bento">
+    <div class="panel c4 r2">
+      <div class="section-title"><h2>Sleep</h2><button class="btn" id="f-sleep">Log sleep</button></div>
+      ${Object.keys(sl).length ? `
+        <p class="big">${lastNight?lastNight+"h":"—"} <span class="muted" style="font-size:15px">last night</span></p>
+        <p class="muted" style="margin:2px 0 10px">${sAvg!=null?`${sAvg.toFixed(1)}h average this week`:"log a few nights for an average"}</p>
+        <div class="bars" style="height:96px;flex:none">
+          ${slDays.map(d=>`<div class="bar-col" title="${d.k}: ${d.h?d.h+"h":"not logged"}">
+            <div class="bar-track"><div class="bar-fill${d.h>=7?" bar-hit":""}" style="height:${Math.round(d.h/slMax*100)}%;${d.h?"":"opacity:.15"}"></div></div>
+            <span class="bar-lab">${d.label}</span></div>`).join("")}
+        </div>
+        <p class="m-meta" style="margin:8px 0 0">Bright bars are seven hours or more.</p>`
+      : `<p class="empty">Nothing logged. One number a morning — or an Apple Shortcut can send it with <code>?sleep=7.5</code>.</p>`}
+    </div>
+
+    <div class="panel c5 r2">
       <div class="section-title"><h2>Weight</h2><button class="btn" id="f-weight">Log weight</button></div>
       ${trendWeight!=null ? `
         <p class="big">${trendWeight.toFixed(1)} <span class="muted" style="font-size:15px">lbs trend</span></p>
         ${rate!=null ? `<p class="muted" style="margin:2px 0 0">${Math.abs(rate).toFixed(1)} lbs/week ${rate<0?"loss":"gain"} · ${wCount} weigh-in${wCount===1?"":"s"} logged</p>`
                      : `<p class="muted" style="margin:2px 0 0">${wCount} weigh-in${wCount===1?"":"s"} — a few more days and a trend appears.</p>`}
         ${sparkline(trendSeries)}
+        <p class="m-meta" style="margin:10px 0 0">${m.kcal
+          ? `Maintenance about <b style="color:var(--pale)">${m.kcal.toLocaleString()} kcal</b>, from ${m.days} days of your own numbers.`
+          : `Maintenance estimate needs ${esc(m.need)}.`}</p>
       ` : `<p class="empty">No weigh-ins yet. Log one, or import from Obsidian.</p>`}
     </div>
 
-    <div class="panel c4">
+    <div class="panel c3">
       <div class="section-title"><h2>Recent sessions</h2></div>
       <div id="mat-list">${mma.length ? mma.slice(0,10).map(s=>`
         <div class="entry"><div class="body"><strong>${esc(discLabel(s.discipline))} · ${s.minutes} min · ${esc(inten(s.intensity)?.label||s.intensity)}</strong>
@@ -2743,7 +2919,7 @@ function fitHistory(mma, lifts){
         : `<p class="empty">No sessions yet.</p>`}</div>
     </div>
 
-    <div class="panel c3">
+    <div class="panel c12">
       <div class="section-title"><h2>Recent lifts</h2></div>
       <div>${lifts.length ? lifts.slice(0,10).map(w=>`
         <div class="entry"><div class="body">
@@ -2996,7 +3172,51 @@ function foodToday(day, foods, totals, t, sp, dayType, types){
 /** The rotation, on its own screen instead of buried under the day. */
 function foodCycle(){
   const types=getDayTypes();
+  const m=estimateMaintenance();
+  const rows=carbActuals(7);
+  const judged=rows.filter(r=>r.logged&&r.type&&!r.isToday);
+  const hit=judged.filter(r=>r.onTarget).length;
   return `
+    <div class="bento">
+    <div class="mod key c4 r2">
+      <span class="m-head">${icon("bolt")} Maintenance</span>
+      ${m.kcal ? `
+        <span class="n-hero">${m.kcal.toLocaleString()}<span class="n-u">kcal</span></span>
+        <span class="m-meta">Estimated from your own ${m.days} days: averaging
+          <b style="color:var(--pale)">${m.avgIntake.toLocaleString()}</b> a day while trending
+          <b style="color:var(--pale)">${m.ratePerWeek<0?"−":"+"}${Math.abs(m.ratePerWeek).toFixed(1)} lb/wk</b>.</span>
+        <span class="m-meta" style="margin-top:6px;padding-top:10px;border-top:1px solid rgba(255,231,234,.07)">${carbWeekAverage()!=null
+          ? `Your rotation averages ${carbWeekAverage().toLocaleString()} — a ${carbWeekAverage()<m.kcal?"deficit":"surplus"} of about ${Math.abs(m.kcal-carbWeekAverage()).toLocaleString()} a day.`
+          : "Turn the rotation on and this says what your deficit actually is."}</span>`
+      : `
+        <span class="n-hero" style="color:var(--faint)">—</span>
+        <span class="m-meta">Worked out from your weigh-ins and what you log, not a formula. Needs ${esc(m.need)}.</span>`}
+    </div>
+
+    <div class="mod c8 r2">
+      <span class="m-head">${icon("check")} Planned vs eaten
+        <span class="sp"></span><span class="m-key">${judged.length?`${hit} OF ${judged.length} ON TARGET`:"THIS WEEK"}</span></span>
+      ${carbCycleOn() ? `<div class="scroller" style="max-height:none;flex:1">
+        ${rows.map(r=>{
+          const cal=r.logged?Math.round(r.actual.calories):null, carbs=r.logged?Math.round(r.actual.carbs):null;
+          const state = r.isToday ? "today" : !r.logged ? "unlogged" : !r.type ? "notype" : r.onTarget ? "hit" : "miss";
+          const pip = state==="hit"?"var(--success)":state==="miss"?"var(--danger)":"var(--faint)";
+          return `<div class="tl-row${state==="miss"?" late":""}">
+            <span class="at">${esc(r.label.toUpperCase())}</span>
+            <span class="pip" style="background:${pip}"></span>
+            <span class="what">
+              ${r.type ? `<b>${esc(r.typeLabel)}</b> · plan ${r.target.calories.toLocaleString()} / ${r.target.carbs}c` : `<span style="color:var(--faint)">No day type</span>`}
+              <small>${r.isToday ? `So far ${cal!=null?cal.toLocaleString():0} / ${carbs??0}c`
+                : !r.logged ? "Nothing logged"
+                : `Ate ${cal.toLocaleString()} / ${carbs}c · ${r.onTarget?"on target":(!r.calOk?`${cal-r.target.calories>0?"+":"−"}${Math.abs(cal-r.target.calories).toLocaleString()} cal`:"")+(!r.calOk&&!r.carbOk?", ":"")+(!r.carbOk?`${carbs-r.target.carbs>0?"+":"−"}${Math.abs(carbs-r.target.carbs)}g carbs`:"")}`}</small>
+            </span>
+          </div>`;}).join("")}
+        </div>
+        <span class="m-meta">On target is within 10% on calories and 20% on carbs. Unlogged days are unknowns, not misses.</span>`
+      : `<p class="m-meta" style="padding:6px 0">Turn the rotation on below and each day gets judged against the type it was given.</p>`}
+    </div>
+    </div>
+
     <div class="panel">
       <div class="section-title">
         <h2>Carb cycle</h2>
@@ -4719,12 +4939,13 @@ function openLift(routine){
   $("#entry-title").textContent = list ? `Log ${routine.name}` : "Log a lift";
   if(list){
     $("#entry-fields").innerHTML = `
-      <p class="note" style="margin-top:12px">Fill in what you actually did. Anything left blank is skipped.</p>
+      <p class="note" style="margin-top:12px">Fill in what you actually did. Anything left blank is skipped.
+        Add <code>+2</code> after a set for partials once clean reps ran out — <code>180x7+2</code> is seven clean, two partial.</p>
       ${list.map((ex,i)=>{
         const st=exerciseStats(ex.name);
         return `<label for="lf-${i}">${esc(ex.name)}
             <span class="faint">target ${esc(String(ex.sets))}×${esc(String(ex.reps))}</span></label>
-          <input id="lf-${i}" data-ex="${esc(ex.name)}" placeholder="185x8, 185x8, 180x7"/>
+          <input id="lf-${i}" data-ex="${esc(ex.name)}" placeholder="185x8, 185x8, 180x7+2"/>
           <p class="note" style="margin:6px 0 0">${esc(overloadHint(ex, st))}</p>`;
       }).join("")}`;
   }else{
@@ -4734,8 +4955,8 @@ function openLift(routine){
       <input id="lf-name" list="lf-known" placeholder="Bench Press" autocomplete="off"/>
       <datalist id="lf-known">${tracked.map(n=>`<option value="${esc(n)}"></option>`).join("")}</datalist>
       <p class="note" id="lf-hint" style="margin:6px 0 0" hidden></p>
-      <label for="lf-sets">Sets <span class="faint">(e.g. 185x8, 185x8, 180x7)</span></label>
-      <input id="lf-sets" placeholder="185x8, 185x8"/>`;
+      <label for="lf-sets">Sets <span class="faint">(e.g. 185x8, 185x8, 180x7+2 — the +2 is partials after clean reps ran out)</span></label>
+      <input id="lf-sets" placeholder="185x8, 185x8, 180x7+2"/>`;
     // Typing a name you have lifted before pulls last time up straight away.
     const hint=$("#lf-hint");
     $("#lf-name").oninput=()=>{
@@ -4744,9 +4965,6 @@ function openLift(routine){
       else hint.hidden=true;
     };
   }
-
-  const parseSets = v => [...String(v).matchAll(/(\d+(?:\.\d+)?)\s*[x×]\s*(\d+)/gi)]
-    .map(m=>({weight:+m[1], reps:+m[2]}));
 
   $("#entry-form").onsubmit=e=>{
     e.preventDefault();
@@ -4784,6 +5002,96 @@ function openWeight(){
     const w=DB.get("weighins",{}); w[todayKey()]=v; DB.set("weighins",w);
     $("#entry-dialog").close(); toast("Weight logged"); renderFitness(); };
   openDialog($("#entry-dialog")); setTimeout(()=>$("#wt-val").focus(),40);
+}
+
+function openSleep(){
+  const s=getSleep(); const day=todayKey();
+  $("#entry-title").textContent="Log sleep";
+  $("#entry-fields").innerHTML=`<label for="sl-val">Hours slept last night</label>
+    <input id="sl-val" inputmode="decimal" value="${s[day]!=null?s[day]:""}" placeholder="7.5"/>
+    <div class="chip-row" style="margin-top:8px">
+      ${[6,6.5,7,7.5,8,8.5].map(h=>`<button type="button" class="chip" data-hrs="${h}">${h}</button>`).join("")}
+    </div>
+    <p class="muted" style="font-size:13px;margin:8px 0 0">Keyed to this morning. Saving again updates it.
+      An Apple Shortcut can send it: open this page with <code>?sleep=7.5</code>.</p>`;
+  $("#entry-fields").querySelectorAll("[data-hrs]").forEach(b=>b.onclick=()=>{ $("#sl-val").value=b.dataset.hrs; });
+  $("#entry-form").onsubmit=e=>{ e.preventDefault();
+    const v=Math.round(parseFloat($("#sl-val").value)*10)/10;
+    if(!isFinite(v)||v<=0||v>24) return;
+    setSleep(day,v); $("#entry-dialog").close(); toast("Sleep logged"); redrawAll(); };
+  openDialog($("#entry-dialog")); setTimeout(()=>$("#sl-val").focus(),40);
+}
+
+// ============================================================================
+// BACKUP
+//
+// Everything lives in this one browser's localStorage and nowhere else. Clear
+// site data, change phones, or have iOS evict it under storage pressure and a
+// year of weigh-ins is gone with nothing to recover from. So: one file out,
+// one file in. Every cd_* key, verbatim, plus enough envelope to refuse a
+// file that is not ours.
+// ============================================================================
+const BACKUP_APP="chaston-dashboard", BACKUP_VERSION=1;
+
+function backupPayload(){
+  const data={};
+  for(let i=0;i<localStorage.length;i++){
+    const k=localStorage.key(i);
+    if(k && k.startsWith("cd_") && k!=="cd_lastBackup"){
+      try{ data[k.slice(3)]=JSON.parse(localStorage.getItem(k)); }catch(e){}
+    }
+  }
+  return {app:BACKUP_APP, version:BACKUP_VERSION, exportedAt:new Date().toISOString(), data};
+}
+
+function exportBackup(){
+  const payload=backupPayload();
+  const n=Object.keys(payload.data).length;
+  if(!n){ toast("Nothing to back up yet"); return; }
+  const blob=new Blob([JSON.stringify(payload,null,1)],{type:"application/json"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download=`chaston-dashboard-${todayKey()}.json`;
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+  DB.set("lastBackup", Date.now());
+  toast(`Backed up ${n} stores`);
+  redrawAll();
+}
+
+/** Days since the last export, or null if there has never been one. */
+function backupAgeDays(){
+  const t=+DB.get("lastBackup",0); return t ? Math.floor((Date.now()-t)/864e5) : null;
+}
+
+function importBackup(){
+  const input=document.createElement("input");
+  input.type="file"; input.accept="application/json,.json";
+  input.onchange=()=>{
+    const f=input.files&&input.files[0]; if(!f) return;
+    f.text().then(txt=>{
+      let p; try{ p=JSON.parse(txt); }catch(e){ toast("That file is not JSON"); return; }
+      if(!p || p.app!==BACKUP_APP || typeof p.data!=="object"){ toast("That is not a dashboard backup"); return; }
+      const keys=Object.keys(p.data);
+      if(!keys.length){ toast("The backup is empty"); return; }
+      const when=p.exportedAt ? new Date(p.exportedAt).toLocaleString() : "an unknown time";
+      // Restoring replaces what is here. Say so, and say what, before doing it.
+      if(!confirm(`Restore ${keys.length} stores from ${when}?\n\nThis replaces what is on this device with what is in the file.`)) return;
+      keys.forEach(k=>DB.set(k, p.data[k]));
+      // Restored data is as backed-up as the file it came from.
+      if(p.exportedAt) DB.set("lastBackup", new Date(p.exportedAt).getTime()||Date.now());
+      toast("Restored — reloading"); setTimeout(()=>location.reload(), 600);
+    });
+  };
+  input.click();
+}
+
+/** Repaint whatever is up, after something several screens read has changed. */
+function redrawAll(){
+  if(current==="Command") renderCommand();
+  else if(current==="Fitness") renderFitness();
+  else if(current==="Food") renderFood();
+  else if(current==="Steps") renderSteps();
 }
 
 // Targets
@@ -4957,8 +5265,14 @@ show(ingested ? "Steps" : "Command");
 if(ingested){
   // A Shortcut backfilling an older day (&date=) should land on that day, not
   // on today looking like nothing happened.
-  if(ingested.day!==todayKey()){ viewDay=ingested.day; renderSteps(); }
-  toast(`${ingested.n.toLocaleString()} steps saved`);
+  if(ingested.day!==todayKey()){ viewDay=ingested.day; if(ingested.kind==="steps") renderSteps(); }
+  toast(ingested.kind==="sleep" ? `${ingested.n}h of sleep saved` : `${ingested.n.toLocaleString()} steps saved`);
+}
+
+// Offline and the home-screen icon. Registered last so it never delays paint,
+// and only on http(s) — a file:// open has no origin to scope it to.
+if("serviceWorker" in navigator && /^https?:/.test(location.protocol)){
+  navigator.serviceWorker.register("/sw.js").catch(()=>{});
 }
 </script>
 </body>

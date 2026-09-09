@@ -44,6 +44,11 @@ serves `index.html` at `/`). All data is stored locally in the browser under
   you actually train.
 - **Steps** — daily goal ring, 7-day chart, and an Apple Shortcut recipe that
   pushes Health's step count in via `?steps=NNNN`.
+- **Sleep** — one number a morning, keyed to the day you woke. Logged from the
+  control wall or sent by a Shortcut with `?sleep=7.5` (add `&date=` to
+  backfill). Fitness → History holds the last fortnight as bars; Command's
+  strip shows last night; the coach pairs a short night with a hard day on the
+  program and names a short week.
 
 Food is split into three screens behind one command bar — **Today**, **Carb
 cycle** and **Nutrition** — so the rotation is one tap rather than a scroll,
@@ -67,6 +72,48 @@ the day you are looking at. Command and the coach always speak about today.
 Command's **Up next** merges open tasks, scheduled events and today's and
 tomorrow's training into one ordered list, soonest first, and the coach counts
 anything overdue.
+
+## What the numbers work out
+**Maintenance calories** (Food → Carb cycle, and under the weight trend) come
+from your own data rather than a formula: over the last 28 days, the trend
+weight at each end, the average intake on the days you logged food, and the
+fact that a pound is about 3,500 kcal. Losing on 2,200 means maintenance is
+above 2,200, and the trend says by how much. It needs two weeks of weigh-ins
+and ten logged days before it will say a number, and says what it still needs
+until then. Against the rotation's average it then states your actual deficit.
+
+**Planned vs eaten** (Food → Carb cycle) judges each of the last seven days
+against the type it was given: on target within 10% on calories and 20% on
+carbs, off by how much otherwise, and unlogged days marked as unknowns rather
+than misses. The coach reports the week's adherence and calls out yesterday
+when it missed.
+
+**PR board** (Fitness → Progress) — every lift's best set by estimated 1RM,
+when it was set, and the heaviest single weight if that was a different set.
+
+**Partials.** A set is `185x8`. Write `185x8+2` for eight clean reps and two
+partials after form broke — wherever sets are typed, the Obsidian importer
+included. Partials are shown but never counted as reps, so the 1RM estimate
+and the volume stay honest; and a set that ends in partials was taken to
+failure, which is what the overload hint reads from it: hit the target and
+grind past it, add weight; fall short, hold the weight and get one more clean.
+
+## Backup
+Everything lives in one browser's `localStorage` and nowhere else. Clear site
+data, change phones, or have iOS evict it under storage pressure and it is gone
+with nothing to recover from. So: **Back Up** on the control wall writes every
+`cd_*` store to one dated JSON file, **Restore** reads one back (it says what
+it is about to replace, and refuses a file that is not ours). The coach starts
+asking once there is something worth losing and no backup for two weeks.
+
+## Offline and the home screen
+`manifest.webmanifest` and `sw.js` make it a real installed app: your own icon
+on the home screen, standalone with no browser chrome, and it loads with no
+signal. The worker is network-first — with a connection you always get the
+newest deploy, and the copy it serves is kept for the next time there isn't
+one. Only successful responses are kept, so a lock screen or an error page can
+never become "the app", and a `?steps=` or `?sleep=` load is never served from
+cache, so a Shortcut always runs against a live page.
 
 ## Google Calendar
 Calendar → Sources → Connect. Google needs an OAuth client ID for this site

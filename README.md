@@ -54,16 +54,39 @@ day you missed, and everything you log there — food, water, steps — lands on
 the day you are looking at. Command and the coach always speak about today.
 - **Planner** — tasks with an optional due date and priority, grouped Overdue /
   Today / Tomorrow / This week / Later / No date, filtered Open / Done / All.
-- **Calendar** — events with a real date and time, grouped chronologically and
-  filtered Upcoming / Past / All. The week ahead of training from your Fitness
-  program shows alongside them, ticked off once the session is logged. Those
-  rows are derived from the program, so they are read-only here — change them on
-  Fitness → Program.
+- **Calendar** — three screens behind one command bar: **Month**, **Agenda** and
+  **Sources**. Month is a real grid — a coloured dot per item, click a day to
+  read it beside the grid, page through with the arrows. Agenda is the list
+  ahead, grouped Today / Tomorrow / This week / Later. Three things feed both:
+  events you add here, **your Google Calendar**, and the week ahead of training
+  from your Fitness program (ticked off once the session is logged). A colour
+  bar on every row says which. Only your own events are editable here — Google's
+  live in Google, and training is derived from Fitness → Program.
 - **Journal / Reselling / Money** — quick capture lists.
 
 Command's **Up next** merges open tasks, scheduled events and today's and
 tomorrow's training into one ordered list, soonest first, and the coach counts
 anything overdue.
+
+## Google Calendar
+Calendar → Sources → Connect. Google needs an OAuth client ID for this site
+before it will hand anything over; the panel walks through making one and shows
+the exact origin to paste into Google. Then the calendar is read (never
+written) and merged into Month, Agenda, Command's **Up next** and the coach.
+Per-calendar switches decide which of your calendars show.
+
+**Why sign-in happens in the browser.** This dashboard is a public URL with no
+login. A server-side integration — an `/api` function holding a secret ICS
+address or a service-account key — would hand the calendar to anyone who found
+the URL. A Google OAuth client ID is public by design and the token it returns
+belongs to whoever signed in, so the calendar stays yours. The token is kept in
+`sessionStorage` and dies with the tab; the events it fetched are cached in
+`localStorage` with everything else, so the month still draws before a token
+comes back and after one expires. Disconnect revokes the token with Google and
+clears the cache.
+
+Because the Google project stays in Testing, Google shows an "unverified app"
+screen the first time. That is expected for something only you use.
 
 ## Obsidian
 Paste daily notes into the importer (Fitness → Import Obsidian) and it reads

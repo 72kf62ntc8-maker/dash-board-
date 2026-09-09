@@ -111,13 +111,35 @@ chain's own page — logging one turns it into an entry you own and can correct,
 and the corrected version is what appears in History next time.
 
 ## Design
-JARVIS command center, violet build. Four colours do the whole job — near-black
-`#07050D` for the ground, dark violet `#120D20` for panels, electric purple
-`#9B5CFF` as the single accent, lavender `#E8DFFF` for text and hot highlights.
-Depth comes from layering translucent surfaces over that ground with hairline
-violet rims rather than heavy shadows, lit by two soft ambient violet pools.
+A control panel, not a website. Four colours do the whole job — near-black
+`#08060A` for the ground, red-charcoal `#1A0E13` for surfaces, signal red
+`#FF3B4E` as the single accent, warm off-white `#FFE7EA` for text.
 
-The only motion is the slow orbital core on Command. It is decorative — not a
-reading of anything — so it follows the OS reduced-motion setting by default,
-and the `PAUSE` / `PLAY` control in the header overrides that either way. The
-choice is remembered.
+**Layout.** Navigation is a 76px icon rail; on a phone it gives way to a bottom
+dock. The top bar is the time, the section, the command palette and status —
+there is no page heading and no breadcrumb. `main` has no max-width and runs
+edge to edge.
+
+Screens are built from a twelve-column **bento** on 92px rows, and modules claim
+the space their importance earns: a 2×2 for today's plan, a 1×1 for a utility.
+Command is the source of truth — every other screen uses its surfaces, type
+scale and primitives rather than inventing another card.
+
+**Surfaces** are told apart by tone, spacing and a two-layer shadow with a
+hairline top highlight, not by drawing a red line around everything. The rim
+appears on hover. Red is for progress, active states, alerts and the numbers
+that matter.
+
+**One shape per question**, so no two metrics read the same way: a radial for
+one number chasing a goal, a segmented bar for parts of a whole, a fill for a
+vessel, a sparkline for a direction, a timeline for a day, a checklist for
+things to tick, square controls for actions.
+
+**On a phone** modules opt in to staying half-width — a number survives half a
+screen, an appointment list does not — so nothing simply stacks. Controls
+become a horizontal shelf.
+
+Motion is two tokens: `--dur` for hovers, `--dur-slow` for the radial's sweep
+and the gauge's fill. Both follow the OS reduced-motion setting by default, and
+the `PAUSE` / `PLAY` control in the header overrides that either way. The choice
+is remembered.

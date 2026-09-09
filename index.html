@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<meta name="theme-color" content="#07050D" />
+<meta name="theme-color" content="#08060A" />
 <title>Chaston's Dashboard</title>
 <!--
   Chaston's Dashboard — a self-contained personal command center.
@@ -14,8 +14,8 @@
   the app is fully usable offline and your data never leaves the device.
 
   Design: the JARVIS command center, violet build. Four colours do the whole
-  job — near-black #07050D for the ground, dark violet #120D20 for panels,
-  electric purple #9B5CFF as the single accent, lavender #E8DFFF for text and
+  job — near-black #08060A for the ground, red-charcoal #1A0E13 for surfaces,
+  signal red #FF3B4E as the single accent, warm off-white #FFE7EA for text and
   hot highlights. Depth comes from LAYERING translucent surfaces over that
   ground with hairline violet rims, not from heavy shadows.
 
@@ -31,49 +31,67 @@
   :root{
     color-scheme: dark;
 
-    /* ---- The four brief colours. Everything else derives from them. ---- */
-    --void:#07050D;      /* near-black — the page ground */
-    --violet:#120D20;    /* dark violet — the panel base */
-    --accent:#9b5cff;    /* electric purple — the one accent */
-    --lav:#e8dfff;       /* lavender — text and hot highlights */
+    /* ---- The four colours. Everything else derives from them. ---- */
+    --void:#08060A;      /* near-black — the page ground */
+    --ember:#1A0E13;     /* dark red-charcoal — the surface base */
+    --accent:#ff3b4e;    /* signal red — the one accent */
+    --pale:#ffe7ea;      /* warm off-white — text and hot highlights */
 
     /* ---- Layered translucent surfaces ----
-       Each level is the violet base at a higher opacity over the void, so a
-       panel nested in a panel reads as a step forward without a hard colour
-       jump. Translucent on purpose: the ambient violet light behind them
-       shows through. */
-    --s1:rgba(18,13,32,.58);
-    --s2:rgba(30,21,54,.70);
-    --s3:rgba(44,31,78,.78);
-    --rim:rgba(155,92,255,.15);        /* hairline edge — default */
-    --rim-strong:rgba(155,92,255,.34); /* emphasised edge — focus, active */
-    --tint:rgba(155,92,255,.12);       /* selected-row wash */
-    --glow:rgba(155,92,255,.30);
+       Each level is the ember base at a higher opacity over the void, so a
+       tile nested in a panel reads as a step forward without a hard colour
+       jump. Deliberately thin: these sit low enough that the ground and the
+       ambient red light read straight through them, which is where the glass
+       comes from. Anything opaque here would kill it. */
+    --s1:rgba(26,15,19,.72);
+    --s2:rgba(38,21,27,.80);
+    --s3:rgba(54,29,37,.86);
+    --rim:rgba(255,59,78,.10);         /* hairline edge — used sparingly */
+    --rim-strong:rgba(255,59,78,.40);  /* emphasised edge — focus, active */
+    --tint:rgba(255,59,78,.13);        /* selected wash */
+    --glow:rgba(255,59,78,.34);
+    --blur:blur(16px);
+    /* Surfaces are told apart by tone, spacing and shadow — not by drawing a
+       red line around everything. The inset highlight is a single hairline of
+       light on the top edge, the way a physical panel catches a room light. */
+    --lift:inset 0 1px 0 rgba(255,231,234,.055), 0 1px 2px rgba(0,0,0,.5), 0 10px 26px -14px rgba(0,0,0,.9);
+    --lift-hi:inset 0 1px 0 rgba(255,231,234,.09), 0 2px 6px rgba(0,0,0,.55), 0 18px 40px -18px rgba(0,0,0,.95);
+    /* Type scale. The gap between levels is the hierarchy. */
+    --fs-hero:clamp(34px,3.4vw,52px);
+    --fs-big:clamp(26px,2.2vw,36px);
+    --fs-title:15px;
+    --fs-meta:12px;
+    --rail:76px;
 
-    --text:var(--lav);
-    --muted:#a294c6;   /* secondary text */
-    --faint:#6d5f93;   /* placeholders, disabled, meta */
+    --text:var(--pale);
+    --muted:#c6a3a9;   /* secondary text */
+    --faint:#8a666e;   /* placeholders, disabled, meta */
 
-    --success:#4ed8a0; --warn:#e9b44c; --danger:#ff6b8a;
-    /* Macro chart slices. Three distinguishable steps along the violet ramp;
-       every slice is labelled too, so colour is never the only cue. */
-    --mac-carbs:#9b5cff; --mac-fat:#e8dfff; --mac-protein:#6c7bff;
-    --radius:12px; --radius-sm:8px;
-    --dur:.16s;
+    /* Green and amber survive the retheme because they carry meaning the red
+       cannot: they are the only hues that are not the brand. Danger is a
+       lighter rose than the accent, and never the only cue — every danger
+       element carries its own words too. */
+    --success:#4ed8a0; --warn:#e9b44c; --danger:#ff7a90;
+    /* Macro chart slices: three steps along the red ramp. Every slice is
+       labelled too, so colour is never the only cue. */
+    --mac-carbs:#ff3b4e; --mac-fat:#ffc2c9; --mac-protein:#ff8a96;
+    --radius:16px; --radius-sm:10px;
+    --dur:.16s; --dur-slow:.5s;
   }
   /* The pause control and the OS setting both land here. `--dur:0s` collapses
      every transition as well, since a transition is motion too. */
-  html.still{--dur:0s}
+  html.still{--dur:0s;--dur-slow:0s}
   html.still *,html.still *::before,html.still *::after{animation:none!important}
 
   *{box-sizing:border-box}
   html,body{margin:0}
   body{
-    /* Ambient violet lighting: two soft, wide, low-opacity pools over the
-       near-black ground. Fixed so they don't slide around on scroll. */
+    /* Ambient red lighting: two soft, wide, low-opacity pools over the
+       near-black ground. Fixed so they don't slide around on scroll, and kept
+       low so the glass has something to catch without the page going pink. */
     background:
-      radial-gradient(900px 520px at 78% -8%, rgba(155,92,255,.16), transparent 62%),
-      radial-gradient(700px 480px at 4% 104%, rgba(90,48,168,.15), transparent 60%),
+      radial-gradient(900px 520px at 78% -8%, rgba(255,59,78,.15), transparent 62%),
+      radial-gradient(700px 480px at 4% 104%, rgba(150,20,40,.16), transparent 60%),
       var(--void);
     background-attachment:fixed;
     color:var(--text);
@@ -87,75 +105,76 @@
   .eyebrow{font:11px/1.5 ui-monospace,"SF Mono","Courier New",monospace;letter-spacing:2.2px;color:var(--muted);text-transform:uppercase}
   [hidden]{display:none!important}
   .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
-  .skip{position:absolute;left:10px;top:-60px;z-index:80;background:var(--accent);color:#140a29;padding:10px 16px;border-radius:var(--radius-sm);font-weight:600;transition:top var(--dur)}
+  .skip{position:absolute;left:10px;top:-60px;z-index:80;background:var(--accent);color:#2a0409;padding:10px 16px;border-radius:var(--radius-sm);font-weight:600;transition:top var(--dur)}
   .skip:focus{top:10px}
 
   /* ---- Line icons: one stroke weight everywhere, inherits colour ---- */
   .i{width:1.25em;height:1.25em;flex:none;stroke:currentColor;fill:none;
      stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;vertical-align:-.25em}
 
-  /* ---- Shell: fixed left rail + scrolling main ---- */
+  /* ---- Shell: an icon rail and a full-bleed panel ----
+     The rail is application navigation, not a website sidebar: icons at a
+     glance, a label small enough to be a reminder rather than a menu item. */
   aside{
-    position:fixed;inset:0 auto 0 0;width:226px;padding:30px 16px;
-    background:linear-gradient(180deg,rgba(18,13,32,.92),rgba(7,5,13,.94));
-    border-right:1px solid var(--rim);backdrop-filter:blur(14px);
-    display:flex;flex-direction:column;z-index:20;
+    position:fixed;inset:0 auto 0 0;width:var(--rail);padding:16px 8px;z-index:20;
+    background:linear-gradient(180deg,rgba(22,12,16,.94),rgba(8,6,10,.96));
+    display:flex;flex-direction:column;align-items:center;gap:14px;
   }
-  .brand{display:flex;align-items:center;gap:11px;color:var(--text);text-decoration:none;font-size:20px;font-weight:600;letter-spacing:2.5px}
-  .brand-mark{color:var(--accent);display:flex;filter:drop-shadow(0 0 10px var(--glow))}
-  .brand-mark .i{width:26px;height:26px;stroke-width:1.4}
-  .brand .sub{display:block;font:9px/2 ui-monospace,"Courier New",monospace;letter-spacing:2px;color:var(--faint)}
-  nav{display:grid;gap:2px;margin-top:26px}
-  nav button{display:flex;align-items:center;gap:12px;color:var(--muted);padding:10px 12px;text-align:left;
-    border-radius:var(--radius-sm);border:1px solid transparent;font-size:14.5px;width:100%;
-    transition:background var(--dur),color var(--dur),border-color var(--dur)}
-  nav button .i{color:var(--faint);transition:color var(--dur)}
-  nav button:hover{color:var(--text);background:var(--s2)}
-  nav button:hover .i{color:var(--accent)}
-  /* Selected state: filled surface + lit rim + a solid accent bar on the
-     leading edge, so it is unmistakable at a glance and not colour-only. */
-  nav button[aria-current]{color:var(--lav);background:linear-gradient(90deg,rgba(155,92,255,.20),var(--s2));
-    border-color:var(--rim-strong);box-shadow:inset 3px 0 var(--accent)}
+  .brand{display:flex;color:var(--accent);text-decoration:none;filter:drop-shadow(0 0 12px var(--glow))}
+  .brand .i{width:26px;height:26px;stroke-width:1.4}
+  .brand span{display:none}
+  nav{display:grid;gap:4px;width:100%}
+  nav button{display:flex;flex-direction:column;align-items:center;gap:5px;width:100%;
+    padding:9px 2px 7px;border-radius:12px;color:var(--faint);
+    font:10px/1 ui-monospace,"Courier New",monospace;letter-spacing:.4px;
+    transition:background var(--dur),color var(--dur),box-shadow var(--dur)}
+  nav button .i{width:20px;height:20px;color:var(--faint);transition:color var(--dur)}
+  nav button:hover{color:var(--muted);background:var(--s1)}
+  nav button:hover .i{color:var(--pale)}
+  /* Selected: an illuminated square. Colour is not the only cue — the surface
+     lights up and the label goes bright too. */
+  nav button[aria-current]{color:var(--pale);background:linear-gradient(180deg,rgba(255,59,78,.22),rgba(255,59,78,.07));
+    box-shadow:0 0 0 1px var(--rim-strong) inset, 0 6px 18px -8px var(--glow)}
   nav button[aria-current] .i{color:var(--accent)}
-  .side-bottom{margin-top:auto;font:10px/1.7 ui-monospace,"Courier New",monospace;letter-spacing:1.2px;color:var(--faint)}
-  .status-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 10px var(--accent);margin-right:7px}
+  .side-bottom{margin-top:auto;text-align:center;font:9px/1.6 ui-monospace,"Courier New",monospace;
+    letter-spacing:.8px;color:var(--faint)}
+  .side-bottom span.words{display:none}
+  .status-dot{display:block;width:6px;height:6px;border-radius:50%;background:var(--accent);
+    box-shadow:0 0 10px var(--accent);margin:0 auto 6px}
 
-  main{margin-left:226px;padding:0 34px 64px;max-width:1500px}
-  header{min-height:72px;display:flex;align-items:center;justify-content:space-between;gap:16px;
-    border-bottom:1px solid var(--rim);flex-wrap:wrap;padding:10px 0}
-  .breadcrumb{font:11px ui-monospace,"Courier New",monospace;letter-spacing:1.6px;color:var(--faint)}
-  .breadcrumb .sep{margin:0 9px}
-  .breadcrumb strong{font-weight:400;color:var(--accent)}
-  .header-right{display:flex;align-items:center;gap:12px;font:12px ui-monospace,"Courier New",monospace;color:var(--muted)}
+  main{margin-left:var(--rail);padding:12px 14px 24px;max-width:none}
+  /* One bar: what time it is, what this is, and the way in. */
+  header{display:flex;align-items:center;gap:14px;padding:4px 2px 12px;flex-wrap:wrap}
+  .now{display:flex;align-items:baseline;gap:10px;flex:none}
+  .now b{font-size:26px;font-weight:600;letter-spacing:-.5px;color:var(--pale);font-variant-numeric:tabular-nums}
+  .now span{font:11px ui-monospace,"Courier New",monospace;letter-spacing:1.4px;color:var(--faint);text-transform:uppercase}
+  .header-right{display:flex;align-items:center;gap:10px;margin-left:auto;font:12px ui-monospace,"Courier New",monospace;color:var(--muted)}
   .icon-btn{display:flex;align-items:center;gap:7px;color:var(--muted);border:1px solid var(--rim);
     background:var(--s1);padding:7px 11px;border-radius:99px;font-size:11px;letter-spacing:1.2px;
     transition:background var(--dur),color var(--dur),border-color var(--dur)}
-  .icon-btn:hover{color:var(--lav);border-color:var(--rim-strong);background:var(--s2)}
-  .icon-btn[aria-pressed="true"]{color:var(--lav);border-color:var(--rim-strong);background:var(--tint)}
+  .icon-btn:hover{color:var(--pale);border-color:var(--rim-strong);background:var(--s2)}
+  .icon-btn[aria-pressed="true"]{color:var(--pale);border-color:var(--rim-strong);background:var(--tint)}
   .avatar{border:1px solid var(--rim);background:var(--s2);width:32px;height:32px;border-radius:50%;
-    display:grid;place-items:center;font-size:12px;letter-spacing:0;color:var(--lav)}
+    display:grid;place-items:center;font-size:12px;letter-spacing:0;color:var(--pale)}
 
-  .page-heading{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;padding:26px 0 20px}
-  h1{font-size:32px;letter-spacing:-.8px;line-height:1.15;margin:6px 0 0;font-weight:500}
-  h1 span,.accent{color:var(--accent)}
-  .page-heading .lead{color:var(--muted);font-size:14px;margin:8px 0 0}
+  .accent{color:var(--accent)}
 
   /* ---- Integrated action-search launcher ----
      A real field in the page header, on every view — not a modal you have to
      summon. Ctrl/Cmd-K just focuses it. */
-  .launcher{position:relative;width:min(380px,100%)}
-  .launcher-box{display:flex;align-items:center;gap:10px;border:1px solid var(--rim);
-    background:var(--s1);border-radius:var(--radius-sm);padding:0 11px;
+  .launcher{position:relative;width:min(340px,100%);flex:0 1 340px}
+  .launcher-box{display:flex;align-items:center;gap:9px;border:1px solid transparent;
+    background:var(--s1);border-radius:11px;padding:0 11px;box-shadow:var(--lift);
     transition:border-color var(--dur),background var(--dur)}
   .launcher-box:focus-within{border-color:var(--rim-strong);background:var(--s2)}
   .launcher-box .i{color:var(--faint)}
-  .launcher input{border:0;background:none;padding:11px 0;width:100%;font-size:14px;outline:none}
+  .launcher input{border:0;background:none;padding:9px 0;width:100%;font-size:13.5px;outline:none}
   .launcher input::placeholder{color:var(--faint)}
   kbd{font:10px ui-monospace,"Courier New",monospace;color:var(--faint);border:1px solid var(--rim);
     padding:3px 6px;border-radius:5px;white-space:nowrap}
   .launcher-list{position:absolute;z-index:40;top:calc(100% + 7px);left:0;right:0;margin:0;padding:6px;
     list-style:none;max-height:60vh;overflow:auto;border:1px solid var(--rim-strong);border-radius:var(--radius);
-    background:rgba(16,11,29,.97);backdrop-filter:blur(16px);box-shadow:0 24px 50px -20px rgba(0,0,0,.85)}
+    background:rgba(24,12,17,.96);backdrop-filter:blur(16px);box-shadow:0 24px 50px -20px rgba(0,0,0,.85)}
   .launcher-list li{display:flex;align-items:center;gap:11px;padding:10px 11px;border-radius:var(--radius-sm);cursor:pointer}
   .launcher-list li .i{color:var(--accent)}
   .launcher-list li .lab{font-size:14px}
@@ -164,25 +183,28 @@
   .launcher-list .none{color:var(--muted);font-size:14px;padding:10px 11px}
 
   /* ---- Panels & primitives ---- */
-  .panel{border:1px solid var(--rim);border-radius:var(--radius);background:var(--s1);
-    backdrop-filter:blur(12px);padding:20px;margin-bottom:16px;
-    box-shadow:inset 0 1px 0 rgba(232,223,255,.05)}
-  .grid{display:grid;gap:16px}
+  .panel{border:1px solid transparent;border-radius:var(--radius);background:var(--s1);
+    padding:16px 17px;margin-bottom:10px;box-shadow:var(--lift)}
+  .bento>.panel{margin-bottom:0}
+  .grid{display:grid;gap:10px}
   .cols-2{grid-template-columns:1.4fr 1fr}
-  .section-title{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:12px;flex-wrap:wrap}
-  .section-title h2{font-size:16px;font-weight:500;margin:0}
-  .primary{background:linear-gradient(180deg,#b985ff,#8a45f5);color:#fff;border:1px solid rgba(232,223,255,.22);
+  .section-title{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:12px;flex-wrap:wrap}
+  .section-title h2{font-size:var(--fs-title);font-weight:600;margin:0;letter-spacing:-.1px;color:var(--pale)}
+  /* The sticky command bar the built-out screens share sits on the same
+     surface as everything else now. */
+  .foodbar{box-shadow:var(--lift)}
+  .primary{background:linear-gradient(180deg,#ff5f6f,#e11d34);color:#fff;border:1px solid rgba(255,231,234,.22);
     padding:9px 16px;border-radius:var(--radius-sm);font-size:14px;font-weight:600;
     box-shadow:0 6px 20px -8px var(--glow);transition:filter var(--dur)}
   .primary:hover{filter:brightness(1.12)}
   .ghost{color:var(--accent);font-size:14px;padding:6px 0;transition:color var(--dur)}
-  .ghost:hover{color:var(--lav)}
+  .ghost:hover{color:var(--pale)}
   .btn{border:1px solid var(--rim);background:var(--s2);color:var(--text);padding:9px 15px;
     border-radius:var(--radius-sm);font-size:14px;transition:background var(--dur),border-color var(--dur)}
   .btn:hover{background:var(--s3);border-color:var(--rim-strong)}
   label{display:block;font-size:13px;margin:14px 0 6px;color:var(--muted)}
   input,textarea,select{width:100%;border:1px solid var(--rim);border-radius:var(--radius-sm);
-    background:rgba(7,5,13,.6);padding:11px;font-size:15px;transition:border-color var(--dur)}
+    background:rgba(10,7,12,.60);padding:11px;font-size:15px;transition:border-color var(--dur)}
   input:focus,textarea:focus,select:focus{border-color:var(--rim-strong)}
   textarea{min-height:90px;resize:vertical;font-family:inherit}
   .muted{color:var(--muted)} .faint{color:var(--faint)}
@@ -190,7 +212,7 @@
   .chip{padding:6px 12px;border:1px solid var(--rim);border-radius:99px;font-size:13px;color:var(--muted);
     font-weight:600;transition:background var(--dur),border-color var(--dur),color var(--dur)}
   .chip:hover{border-color:var(--rim-strong);color:var(--text)}
-  .chip.on{background:var(--tint);border-color:var(--accent);color:var(--lav)}
+  .chip.on{background:var(--tint);border-color:var(--accent);color:var(--pale)}
   .chip-row{display:flex;flex-wrap:wrap;gap:6px}
   .tag{font:10px ui-monospace,"Courier New",monospace;letter-spacing:1.4px;color:var(--accent)}
 
@@ -203,48 +225,9 @@
   .tabs button:hover{color:var(--text);background:var(--s2)}
   /* Selected tab: filled accent wash, lit rim, brighter label — three cues,
      none of them colour alone. */
-  .tabs button[aria-selected="true"]{color:var(--lav);background:linear-gradient(180deg,rgba(155,92,255,.30),rgba(155,92,255,.16));
+  .tabs button[aria-selected="true"]{color:var(--pale);background:linear-gradient(180deg,rgba(255,59,78,.30),rgba(255,59,78,.16));
     border-color:var(--rim-strong);box-shadow:0 2px 12px -4px var(--glow)}
   .tabs .count{opacity:.6;margin-left:6px;font-weight:400}
-
-  .actions{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-  .action{display:flex;align-items:center;gap:13px;text-align:left;padding:14px 15px;
-    border:1px solid var(--rim);background:var(--s2);border-radius:var(--radius-sm);color:var(--text);
-    transition:background var(--dur),border-color var(--dur),transform var(--dur)}
-  .action:hover{background:var(--s3);border-color:var(--rim-strong);transform:translateY(-1px)}
-  .action .i{width:20px;height:20px;color:var(--accent)}
-  .action .txt{min-width:0;flex:1}
-  .action strong{display:block;font-size:14px;font-weight:500}
-  .action small{display:block;color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .action .arrow{color:var(--faint);width:15px;height:15px;transition:color var(--dur)}
-  .action:hover .arrow{color:var(--accent)}
-
-  /* ---- Hero: copy + slow decorative orbital core ---- */
-  .hero{display:flex;align-items:center;justify-content:space-between;gap:24px;position:relative;overflow:hidden;
-    border:1px solid var(--rim-strong);border-radius:var(--radius);padding:26px 32px;min-height:230px;margin-bottom:16px;
-    background:
-      radial-gradient(560px 300px at 78% 50%, rgba(155,92,255,.20), transparent 65%),
-      linear-gradient(120deg, rgba(30,21,54,.86), rgba(9,6,17,.92));
-    backdrop-filter:blur(12px);
-    box-shadow:inset 0 1px 0 rgba(232,223,255,.10)}
-  .hero-copy{z-index:1;max-width:60%}
-  .hero h2{font-size:30px;font-weight:350;line-height:1.18;margin:10px 0 8px}
-  .hero h2 span{color:var(--accent)}
-  .hero p{color:var(--muted);font-size:14px;margin:0}
-
-  /* The orbital core. Purely decorative — it is not a reading of anything, so
-     it is aria-hidden and the number it frames is also printed in the copy.
-     Rotation is applied to SVG groups, which needs fill-box origins. */
-  .core-wrap{position:relative;width:190px;height:190px;flex:none}
-  .core-wrap svg{position:absolute;inset:0;width:100%;height:100%}
-  .core-wrap g{transform-box:fill-box;transform-origin:center}
-  .spin-a{animation:spin 150s linear infinite}
-  .spin-b{animation:spin 90s linear infinite reverse}
-  .spin-c{animation:spin 46s linear infinite}
-  .core-read{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
-  .core-read b{font-size:32px;font-weight:600;color:var(--lav);text-shadow:0 0 22px var(--glow);line-height:1}
-  .core-read small{font:8px ui-monospace,"Courier New",monospace;letter-spacing:2.4px;color:var(--accent);margin-top:5px}
-  @keyframes spin{to{transform:rotate(360deg)}}
 
   /* ---- Rings ---- */
   .rings{display:flex;gap:22px;flex-wrap:wrap}
@@ -267,7 +250,7 @@
   .list-metric{display:flex;justify-content:space-between;gap:12px;font-size:14px;padding:8px 0;border-top:1px solid var(--rim)}
   .list-metric:first-child{border-top:0}
   .list-metric .k{color:var(--muted)}
-  .big{font-size:30px;font-weight:600;letter-spacing:-.5px;margin:0}
+  .big{font-size:var(--fs-big);font-weight:600;letter-spacing:-.5px;margin:0}
   .coach-line{font-size:14px;margin:0 0 8px;padding-left:12px;border-left:2px solid var(--rim-strong)}
   .coach-warn{border-left-color:var(--warn);color:#f0d3a0}
   .coach-good{border-left-color:var(--success);color:#a4e8cc}
@@ -275,7 +258,7 @@
 
   /* ---- Food command bar ---- */
   .foodbar{position:sticky;top:0;z-index:15;padding:14px 16px;
-    background:rgba(16,11,29,.92);backdrop-filter:blur(16px)}
+    background:rgba(24,12,17,.90);backdrop-filter:blur(16px)}
   .foodbar-top{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
   .foodbar .tabs{margin-top:12px}
   /* Two columns that fold to one: the ring and where you stand beside it. */
@@ -297,7 +280,7 @@
     border:1px solid var(--rim);position:relative;flex:none;transition:background var(--dur),border-color var(--dur)}
   .switch .knob::after{content:'';position:absolute;top:2px;left:2px;width:11px;height:11px;border-radius:50%;
     background:var(--faint);transition:transform var(--dur),background var(--dur)}
-  .switch[aria-pressed="true"]{color:var(--lav);border-color:var(--rim-strong)}
+  .switch[aria-pressed="true"]{color:var(--pale);border-color:var(--rim-strong)}
   .switch[aria-pressed="true"] .knob{background:var(--tint);border-color:var(--accent)}
   .switch[aria-pressed="true"] .knob::after{transform:translateX(13px);background:var(--accent)}
 
@@ -308,7 +291,7 @@
   .typerow .macros{margin-left:auto;font:11px ui-monospace,"Courier New",monospace;
     letter-spacing:.8px;color:var(--muted);white-space:nowrap}
   .daytype{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--rim-strong);
-    background:var(--tint);color:var(--lav);border-radius:99px;padding:4px 12px;
+    background:var(--tint);color:var(--pale);border-radius:99px;padding:4px 12px;
     font:11px ui-monospace,"Courier New",monospace;letter-spacing:1.4px}
   .daytype b{font-weight:600;color:var(--accent)}
 
@@ -317,11 +300,11 @@
   .daynav button[data-day="-1"],.daynav button[data-day="1"]{
     display:flex;color:var(--muted);border:1px solid var(--rim);background:var(--s2);
     padding:5px;border-radius:var(--radius-sm);transition:background var(--dur),color var(--dur),border-color var(--dur)}
-  .daynav button[data-day="-1"]:hover,.daynav button[data-day="1"]:hover{color:var(--lav);border-color:var(--rim-strong);background:var(--s3)}
+  .daynav button[data-day="-1"]:hover,.daynav button[data-day="1"]:hover{color:var(--pale);border-color:var(--rim-strong);background:var(--s3)}
   .daynav button[disabled]{opacity:.35;cursor:default}
   .daynav .i{width:16px;height:16px}
   .daynav .d{font:11px ui-monospace,"Courier New",monospace;letter-spacing:1.4px;
-    color:var(--lav);text-transform:uppercase;min-width:96px;text-align:center}
+    color:var(--pale);text-transform:uppercase;min-width:96px;text-align:center}
 
   /* ---- Food ---- */
   .meal-head,.group-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;
@@ -354,6 +337,170 @@
   .delta{font-size:12.5px;font-weight:600}
   .delta.up{color:var(--success)} .delta.down{color:var(--warn)} .delta.flat{color:var(--muted)}
 
+  /* ---- Dock: the phone's navigation, under the thumb ---- */
+  #dock{display:none}
+  @media (max-width:900px){
+    :root{--rail:0px}
+    aside{display:none}
+    main{margin-left:0;padding:10px 12px 84px}
+    #dock{position:fixed;inset:auto 0 0 0;z-index:30;display:grid;
+      grid-auto-flow:column;grid-auto-columns:1fr;gap:2px;padding:7px 8px calc(7px + env(safe-area-inset-bottom));
+      background:linear-gradient(180deg,rgba(16,9,12,.86),rgba(8,6,10,.97));
+      backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+      box-shadow:0 -1px 0 rgba(255,231,234,.06)}
+    #dock button{display:flex;flex-direction:column;align-items:center;gap:4px;padding:7px 1px 5px;
+      border-radius:10px;color:var(--faint);font:8.5px/1 ui-monospace,"Courier New",monospace;
+      letter-spacing:-.2px;overflow:hidden;
+      transition:background var(--dur),color var(--dur)}
+    #dock button span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    #dock button .i{width:19px;height:19px;color:var(--faint)}
+    #dock button[aria-current]{color:var(--pale);background:rgba(255,59,78,.14)}
+    #dock button[aria-current] .i{color:var(--accent)}
+    header{gap:8px;padding:2px 0 10px}
+    .now b{font-size:22px}
+    .header-right{margin-left:auto;order:1}
+    .launcher{order:2;flex:1 0 100%;width:100%}
+  }
+
+  /* ---- Bento ----
+     Twelve columns, 92px rows. Modules claim the space their importance
+     earns: a 2x2 for today's plan, a 1x1 for a utility. Nothing is centred
+     inside a narrow column — the grid is the interface. */
+  .bento{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));
+    grid-auto-rows:minmax(92px,auto);gap:10px}
+  .c2{grid-column:span 2}  .c3{grid-column:span 3}  .c4{grid-column:span 4}
+  .c5{grid-column:span 5}  .c6{grid-column:span 6}  .c7{grid-column:span 7}
+  .c8{grid-column:span 8}
+  .c12{grid-column:span 12}
+  .r2{grid-row:span 2} .r3{grid-row:span 3} .r4{grid-row:span 4}
+
+  /* A surface, not a card. No outline by default — tone and shadow do the
+     separating. The rim only appears when you are pointing at it. */
+  .mod{position:relative;display:flex;flex-direction:column;gap:8px;overflow:hidden;
+    padding:15px 17px;border-radius:var(--radius);background:var(--s1);
+    box-shadow:var(--lift);border:1px solid transparent;color:var(--text);
+    transition:background var(--dur),box-shadow var(--dur),border-color var(--dur),transform var(--dur)}
+  button.mod,a.mod{text-align:left;width:100%;cursor:pointer}
+  button.mod:hover,a.mod:hover{background:var(--s2);box-shadow:var(--lift-hi);
+    border-color:var(--rim);transform:translateY(-1px)}
+  button.mod:active{transform:none}
+  /* The one module on a screen that is genuinely the headline. */
+  .mod.key{background:linear-gradient(152deg,rgba(255,59,78,.15),var(--s1) 58%);
+    box-shadow:var(--lift), 0 0 44px -22px var(--glow)}
+  .mod.bare{background:none;box-shadow:none;padding:0}
+
+  .m-head{display:flex;align-items:center;gap:8px;font-size:var(--fs-title);font-weight:600;
+    color:var(--pale);letter-spacing:-.1px}
+  .m-head .i{width:17px;height:17px;color:var(--accent)}
+  .m-head .sp{margin-left:auto}
+  .m-key{font:10px ui-monospace,"Courier New",monospace;letter-spacing:1.5px;color:var(--faint);
+    text-transform:uppercase}
+  .m-meta{font-size:var(--fs-meta);color:var(--faint);line-height:1.5}
+  .m-foot{margin-top:auto}
+  /* The number is the point. It gets the room. */
+  .n-hero{font-size:var(--fs-hero);font-weight:600;letter-spacing:-2px;line-height:.92;
+    color:var(--pale);font-variant-numeric:tabular-nums}
+  .n-big{font-size:var(--fs-big);font-weight:600;letter-spacing:-1.2px;line-height:1;
+    color:var(--pale);font-variant-numeric:tabular-nums}
+  .n-u{font-size:13px;font-weight:400;letter-spacing:0;color:var(--muted);margin-left:5px}
+
+  /* ---- Radial: for a single number chasing a single goal ---- */
+  .radial{position:relative;display:grid;place-items:center;flex:1;min-height:0}
+  .radial svg{width:100%;height:100%;max-height:190px;transform:rotate(-90deg)}
+  .radial .rd-read{position:absolute;text-align:center;line-height:1}
+  .radial .rd-read b{display:block;font-size:var(--fs-hero);font-weight:600;letter-spacing:-2px;
+    color:var(--pale);font-variant-numeric:tabular-nums}
+  .radial .rd-read span{display:block;margin-top:6px;font:10px ui-monospace,"Courier New",monospace;
+    letter-spacing:1.6px;color:var(--faint)}
+
+  /* ---- Segmented bar: for parts of a whole, like macros ---- */
+  .seg{display:flex;height:8px;border-radius:99px;overflow:hidden;background:rgba(255,255,255,.05)}
+  .seg i{display:block;height:100%}
+  .seg-key{display:flex;gap:14px;flex-wrap:wrap;font-size:var(--fs-meta);color:var(--muted)}
+  .seg-key b{color:var(--pale);font-weight:600;font-variant-numeric:tabular-nums}
+  .seg-key .sw{display:inline-block;width:7px;height:7px;border-radius:2px;margin-right:6px;vertical-align:1px}
+
+  /* ---- Fill gauge: for a vessel filling up, like water ---- */
+  .gauge{display:flex;align-items:flex-end;gap:12px;flex:1;min-height:0}
+  .fill{position:relative;width:34px;flex:none;height:100%;min-height:72px;max-height:118px;
+    border-radius:9px;overflow:hidden;background:rgba(255,255,255,.05);
+    box-shadow:inset 0 0 0 1px rgba(255,231,234,.06)}
+  .fill i{position:absolute;inset:auto 0 0 0;background:linear-gradient(180deg,var(--accent),#8d1425);
+    transition:height var(--dur-slow) ease}
+  .gauge .rd{display:flex;flex-direction:column;gap:2px;padding-bottom:2px}
+
+  /* ---- Square icon controls: the quick-action wall ---- */
+  .ctrls{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:8px}
+  .ctrl{display:flex;flex-direction:column;align-items:flex-start;gap:9px;aspect-ratio:1;
+    padding:11px;border-radius:14px;background:var(--s1);box-shadow:var(--lift);
+    border:1px solid transparent;color:var(--muted);font-size:11.5px;line-height:1.25;
+    transition:background var(--dur),color var(--dur),border-color var(--dur),transform var(--dur)}
+  .ctrl .i{width:19px;height:19px;color:var(--accent)}
+  .ctrl b{font-weight:600;color:var(--pale);margin-top:auto;font-size:12px}
+  .ctrl:hover{background:var(--s2);border-color:var(--rim);transform:translateY(-1px)}
+
+  /* ---- Timeline: the day as a strip of hours, not a list of rows ---- */
+  .tl{display:flex;flex-direction:column;gap:2px;overflow-y:auto;flex:1;min-height:0;
+    margin-right:-6px;padding-right:6px}
+  .tl-row{display:flex;gap:11px;align-items:flex-start;padding:7px 0}
+  .tl-row .at{flex:none;width:46px;font:11px ui-monospace,"Courier New",monospace;color:var(--faint);
+    padding-top:2px;font-variant-numeric:tabular-nums}
+  .tl-row .pip{flex:none;width:3px;align-self:stretch;min-height:20px;border-radius:99px;background:var(--accent)}
+  .tl-row .what{flex:1;min-width:0;font-size:13.5px;color:var(--pale)}
+  .tl-row .what small{display:block;color:var(--faint);font-size:11.5px;margin-top:2px}
+  .tl-row.late .at{color:var(--danger)}
+  .tl-row.done .what{text-decoration:line-through;color:var(--faint)}
+
+  /* ---- Checklist: tasks you can actually tick here ---- */
+  .cl{display:flex;flex-direction:column;overflow-y:auto;flex:1;min-height:0;margin-right:-6px;padding-right:6px}
+  .cl-row{display:flex;align-items:center;gap:11px;padding:8px 0;font-size:13.5px}
+  .cl-box{flex:none;width:19px;height:19px;border-radius:6px;background:rgba(255,255,255,.05);
+    box-shadow:inset 0 0 0 1px rgba(255,231,234,.13);display:grid;place-items:center;
+    color:transparent;transition:var(--dur)}
+  .cl-box:hover{box-shadow:inset 0 0 0 1px var(--rim-strong)}
+  .cl-row.on .cl-box{background:var(--accent);color:#2a0409;box-shadow:none}
+  .cl-box .i{width:13px;height:13px;stroke-width:2.6}
+  .cl-row .txt{flex:1;min-width:0;color:var(--pale)}
+  .cl-row.on .txt{text-decoration:line-through;color:var(--faint)}
+  .cl-row .tag2{font:10px ui-monospace,"Courier New",monospace;letter-spacing:1px;color:var(--faint)}
+  .cl-row .tag2.late{color:var(--danger)}
+
+  /* ---- Status strip: state of things, one line, scrolls on small screens ---- */
+  .strip{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;padding-bottom:2px}
+  .strip::-webkit-scrollbar{display:none}
+  .st{display:flex;align-items:center;gap:8px;flex:none;padding:8px 13px;border-radius:11px;
+    background:var(--s1);box-shadow:var(--lift);font-size:12px;color:var(--muted);white-space:nowrap}
+  .st b{color:var(--pale);font-weight:600;font-variant-numeric:tabular-nums}
+  .st .dot{width:6px;height:6px;border-radius:99px;flex:none;background:var(--accent);box-shadow:0 0 8px var(--accent)}
+  .st .dot.ok{background:var(--success);box-shadow:0 0 8px var(--success)}
+  .st .dot.off{background:var(--faint);box-shadow:none}
+
+  .scroller{overflow-y:auto;max-height:300px;margin-right:-6px;padding-right:6px}
+  .scroller::-webkit-scrollbar,.tl::-webkit-scrollbar,.cl::-webkit-scrollbar{width:5px}
+  .scroller::-webkit-scrollbar-thumb,.tl::-webkit-scrollbar-thumb,.cl::-webkit-scrollbar-thumb{
+    background:rgba(255,231,234,.14);border-radius:99px}
+
+  /* ---- Reflow: tablet keeps the hierarchy, phone becomes a control sheet --- */
+  @media (max-width:1180px){
+    .bento{grid-template-columns:repeat(6,minmax(0,1fr))}
+    .c7,.c8,.c12{grid-column:span 6} .c5{grid-column:span 3} .c4{grid-column:span 3}
+  }
+  /* A phone is not a narrow desktop. Two columns, and a module says for
+     itself whether it still works at half width — a number does, a list of
+     appointments does not. Nothing simply stacks. */
+  @media (max-width:720px){
+    .bento{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+    .c2,.c3,.c4,.c5,.c6,.c7,.c8,.c12{grid-column:span 2}
+    .half{grid-column:span 1}
+    .r2,.r3,.r4{grid-row:auto}
+    .radial svg{max-height:150px}
+    /* Controls become a single scrolling shelf rather than a wall of rows. */
+    .ctrls{display:flex;overflow-x:auto;gap:8px;scrollbar-width:none;
+      margin:0 -17px;padding:0 17px 2px;scroll-snap-type:x proximity}
+    .ctrls::-webkit-scrollbar{display:none}
+    .ctrl{flex:none;width:88px;scroll-snap-align:start}
+  }
+
   /* ---- Month grid ---- */
   .cal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
   .cal-head h2{margin:0;font-size:17px;font-weight:600}
@@ -371,7 +518,7 @@
   .cal-day:hover{background:var(--s2)}
   .cal-day.out{opacity:.32}
   .cal-day.today{border-color:var(--rim-strong)}
-  .cal-day.today .n{color:var(--lav);font-weight:700}
+  .cal-day.today .n{color:var(--pale);font-weight:700}
   .cal-day[aria-pressed="true"]{background:var(--tint);border-color:var(--rim-strong)}
   .cal-day .n{font-size:12.5px;line-height:1}
   .cal-dots{display:flex;flex-wrap:wrap;gap:3px}
@@ -406,14 +553,14 @@
   details.how[open] summary::before{content:"− "}
   details.how ol{margin:10px 0 0;padding-left:20px;color:var(--muted);font-size:13px;line-height:1.75}
   details.how p{margin:10px 0 0;color:var(--faint);font-size:12.5px}
-  .mono{font:12px ui-monospace,"Courier New",monospace;color:var(--lav);background:var(--s2);
+  .mono{font:12px ui-monospace,"Courier New",monospace;color:var(--pale);background:var(--s2);
     padding:1px 6px;border-radius:4px;border:1px solid var(--rim);word-break:break-all}
 
   /* ---- Planner / Calendar ---- */
   .due{font:10px ui-monospace,"Courier New",monospace;letter-spacing:1.2px;padding:3px 9px;
     border-radius:99px;border:1px solid var(--rim);color:var(--muted);white-space:nowrap;flex:none}
-  .due.now{border-color:var(--rim-strong);color:var(--lav);background:var(--tint)}
-  .due.late{border-color:var(--danger);color:#ffb3c4;background:rgba(255,107,138,.13)}
+  .due.now{border-color:var(--rim-strong);color:var(--pale);background:var(--tint)}
+  .due.late{border-color:var(--danger);color:#ffc2cd;background:rgba(255,122,144,.14)}
   /* Priority is a dot, not a colour on the text — it has to survive being read
      by someone who cannot tell the two apart, so the tooltip names it too. */
   .prio{width:7px;height:7px;border-radius:50%;flex:none;margin-top:7px}
@@ -453,7 +600,7 @@
   .subtabs button{padding:9px 1px;font-size:14px;color:var(--muted);white-space:nowrap;
     border-bottom:2px solid transparent;margin-bottom:-1px;transition:color var(--dur),border-color var(--dur)}
   .subtabs button:hover{color:var(--text)}
-  .subtabs button[aria-selected="true"]{color:var(--lav);font-weight:600;border-bottom-color:var(--accent)}
+  .subtabs button[aria-selected="true"]{color:var(--pale);font-weight:600;border-bottom-color:var(--accent)}
   .capture{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:14px 0}
   .capture button{display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 4px;
     border:1px solid var(--rim);background:var(--s2);border-radius:var(--radius-sm);
@@ -486,51 +633,38 @@
   /* ---- Dialogs ---- */
   dialog.wide{width:min(680px,calc(100% - 28px))}
   dialog{width:min(480px,calc(100% - 28px));max-height:88vh;overflow:auto;border:1px solid var(--rim-strong);border-radius:var(--radius);
-    background:rgba(20,14,36,.97);backdrop-filter:blur(18px);color:var(--text);padding:24px;
+    background:rgba(26,14,19,.96);backdrop-filter:blur(18px);color:var(--text);padding:24px;
     box-shadow:0 30px 70px -25px rgba(0,0,0,.9)}
   /* The browser and detail dialogs are tall: keep their header and footer put
      and scroll only the middle, so Log is always reachable. */
   .dialog-scroll{overflow:auto;max-height:62vh;margin:0 -4px;padding:0 4px}
-  dialog::backdrop{background:rgba(5,3,11,.78);backdrop-filter:blur(4px)}
+  dialog::backdrop{background:rgba(6,4,8,.80);backdrop-filter:blur(4px)}
   .dialog-top{display:flex;justify-content:space-between;align-items:center;gap:10px}
   .dialog-top h2{font-size:20px;margin:0}
   .close{color:var(--muted);display:flex;padding:4px;border-radius:6px;transition:color var(--dur),background var(--dur)}
-  .close:hover{color:var(--lav);background:var(--s2)}
+  .close:hover{color:var(--pale);background:var(--s2)}
   .dialog-actions{display:flex;gap:10px;margin-top:20px}
   .dialog-actions .primary{flex:1}
-  #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--lav);color:#180d2e;
+  #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--pale);color:#2a0409;
     border-radius:99px;padding:11px 22px;font-weight:600;z-index:60;box-shadow:0 10px 30px -10px rgba(0,0,0,.8)}
 
-  .bars{display:flex;align-items:flex-end;gap:8px;height:120px}
+  .bars{display:flex;align-items:flex-end;gap:8px;flex:1;min-height:110px}
   .bar-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;height:100%}
-  .bar-track{flex:1;width:100%;display:flex;align-items:flex-end;background:var(--s2);border-radius:5px;overflow:hidden}
-  .bar-fill{width:100%;background:linear-gradient(180deg,#8a45f5,#3d1f77);border-radius:5px 5px 0 0;min-height:2px}
-  .bar-hit{background:linear-gradient(180deg,var(--lav),var(--accent))}
+  .bar-track{flex:1;width:100%;display:flex;align-items:flex-end;background:rgba(255,255,255,.045);border-radius:6px;overflow:hidden}
+  .bar-fill{width:100%;background:linear-gradient(180deg,#ff3b4e,#7d1220);border-radius:5px 5px 0 0;min-height:2px}
+  .bar-hit{background:linear-gradient(180deg,var(--pale),var(--accent))}
   .bar-lab{font:10px ui-monospace,"Courier New",monospace;color:var(--muted)}
-  code{font:12px ui-monospace,"Courier New",monospace;color:var(--lav)}
+  code{font:12px ui-monospace,"Courier New",monospace;color:var(--pale)}
 
   /* The OS setting is the default; the header control can override it either
      way, and does so by toggling .still on <html>. */
   @media (prefers-reduced-motion:reduce){
-    html:not(.moving) .spin-a,html:not(.moving) .spin-b,html:not(.moving) .spin-c{animation:none}
-    html:not(.moving) *{transition-duration:0s!important}
+    html:not(.moving) *{transition-duration:0s!important;animation:none!important}
   }
 
-  /* ---- Tablet / mobile: the rail becomes a top scroller ---- */
+  /* ---- Tablet / mobile: the rail gives way to the dock (see #dock) ---- */
   @media (max-width:900px){
-    aside{position:static;width:auto;padding:12px 16px;border-right:0;border-bottom:1px solid var(--rim);
-      flex-direction:row;align-items:center;gap:14px}
-    .brand .sub,.side-bottom,aside .eyebrow{display:none}
-    nav{grid-auto-flow:column;grid-template-columns:none;overflow:auto;margin:0;gap:4px;scrollbar-width:none}
-    nav::-webkit-scrollbar{display:none}
-    nav button{white-space:nowrap;padding:8px 12px}
-    main{margin-left:0;padding:0 16px 52px}
     .cols-2{grid-template-columns:1fr}
-    .actions{grid-template-columns:repeat(2,1fr)}
-    .hero{flex-direction:column;align-items:flex-start;padding:22px}
-    .hero-copy{max-width:100%}
-    .page-heading{flex-direction:column;align-items:stretch}
-    .launcher{width:100%}
     .section-title .tabs{flex:1 0 100%}
     .tabs button{flex:1;text-align:center;padding:7px 10px}
   }
@@ -542,10 +676,6 @@
   .launcher-list .txt{min-width:0;flex:1}
 
   @media (max-width:560px){
-    .actions{grid-template-columns:1fr}
-    h1{font-size:27px}
-    .hero h2{font-size:25px}
-    .core-wrap{width:150px;height:150px;align-self:center}
     .rings{gap:14px;justify-content:center}
     .goalbars{grid-template-columns:repeat(2,1fr)}
     .capture{grid-template-columns:repeat(2,1fr)}
@@ -572,41 +702,33 @@
 <body>
 <a class="skip" href="#main">Skip to content</a>
 <aside>
-  <span class="brand"><span class="brand-mark" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="m12 2.5 8.2 4.75v9.5L12 21.5 3.8 16.75v-9.5Z"/><circle cx="12" cy="12" r="2.6"/></svg></span><span>CHASTON<span class="sub">PERSONAL OS / 01</span></span></span>
-  <p class="eyebrow" style="margin:24px 0 0">Workspace</p>
+  <span class="brand" aria-hidden="true"><span class="brand-mark"><svg class="i" viewBox="0 0 24 24"><path d="m12 2.5 8.2 4.75v9.5L12 21.5 3.8 16.75v-9.5Z"/><circle cx="12" cy="12" r="2.6"/></svg></span><span>CHASTON<span class="sub">PERSONAL OS / 01</span></span></span>
   <nav id="navigation" aria-label="Sections"></nav>
-  <div class="side-bottom"><span class="status-dot"></span>LOCAL · ON DEVICE<br /><span style="font-family:'Segoe UI'">Your day. In command.</span></div>
+  <div class="side-bottom" title="All data stays in this browser"><span class="status-dot"></span>LOCAL</div>
 </aside>
 
 <main id="main">
   <header>
-    <div class="breadcrumb">WORKSPACE <span class="sep" aria-hidden="true">/</span> <strong id="crumb">COMMAND</strong></div>
-    <div class="header-right">
-      <button id="motion-toggle" class="icon-btn" aria-pressed="false"><span id="motion-icon" aria-hidden="true"></span><span id="motion-label">MOTION</span></button>
-      <time id="clock"></time>
-      <span class="avatar" aria-hidden="true">C</span>
-    </div>
-  </header>
+    <span class="now"><b id="clock"></b><span id="crumb">COMMAND</span></span>
 
-  <section class="page-heading">
-    <div>
-      <p class="eyebrow" id="eyebrow">Personal operations</p>
-      <h1 id="title">Command center<span>.</span></h1>
-      <p class="lead" id="subtitle">A clear view of what comes next.</p>
-    </div>
-
-    <!-- Integrated action-search launcher: always on screen, on every view. -->
+    <!-- The way into everything, on every view. -->
     <div class="launcher">
       <label class="sr-only" for="launcher-input">Search actions and sections</label>
       <div class="launcher-box">
         <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.6 4.6"/></svg>
-        <input id="launcher-input" type="text" autocomplete="off" placeholder="Search actions and sections…"
+        <input id="launcher-input" type="text" autocomplete="off" placeholder="Search…"
                role="combobox" aria-expanded="false" aria-controls="launcher-list" aria-autocomplete="list" />
         <kbd>Ctrl K</kbd>
       </div>
       <ul id="launcher-list" class="launcher-list" role="listbox" aria-label="Matching actions" hidden></ul>
     </div>
-  </section>
+
+    <div class="header-right">
+      <span id="subtitle" class="sr-only"></span>
+      <button id="motion-toggle" class="icon-btn" aria-pressed="false"><span id="motion-icon" aria-hidden="true"></span><span id="motion-label">MOTION</span></button>
+      <span class="avatar" aria-hidden="true">C</span>
+    </div>
+  </header>
 
   <!-- Views are populated by JS; only one is shown at a time. -->
   <div id="view-command"></div>
@@ -615,6 +737,8 @@
   <div id="view-steps" hidden></div>
   <div id="view-generic" hidden></div>
 </main>
+
+<nav id="dock" aria-label="Sections"></nav>
 
 <!-- Capture dialog: add an entry to any list-based section -->
 <dialog id="entry-dialog" aria-labelledby="entry-title">
@@ -1989,9 +2113,23 @@ const GENERIC = {
 };
 let current = "Command";
 
-const nav = $("#navigation");
-MODULES.forEach(m=>{ const b=document.createElement("button"); b.type="button"; b.dataset.module=m.id;
-  b.innerHTML=`${icon(m.ic)}<span>${m.id}</span>`; b.onclick=()=>show(m.id); nav.append(b); });
+// Two navs, one list. The rail is the desktop one; the dock is the phone's,
+// pinned under the thumb. The six that lead are the ones you open in a hurry;
+// More opens the launcher, which can reach every section by name — so nothing
+// is more than two taps away even though the dock only holds six.
+const DOCK = ["Command","Fitness","Food","Steps","Calendar","Planner"];
+MODULES.forEach(m=>{
+  const b=document.createElement("button"); b.type="button"; b.dataset.module=m.id;
+  b.innerHTML=`${icon(m.ic)}<span>${m.id}</span>`; b.onclick=()=>show(m.id);
+  $("#navigation").append(b);
+  if(DOCK.includes(m.id)){
+    const d=b.cloneNode(true); d.onclick=()=>show(m.id); $("#dock").append(d);
+  }
+});
+(()=>{ const more=document.createElement("button"); more.type="button"; more.dataset.more="1";
+  more.innerHTML=`${icon("stack")}<span>More</span>`;
+  more.onclick=()=>{ $("#launcher-input").focus(); };
+  $("#dock").append(more); })();
 
 function show(name){
   // Landing on a section always starts at today; the day strip travels from
@@ -1999,7 +2137,9 @@ function show(name){
   // what looks like a day where you ate nothing.
   if(name!==current){ viewDay=todayKey(); foodTab="today"; fitTab="today"; }
   current = name;
-  document.querySelectorAll("nav button").forEach(b=>{ const on=b.dataset.module===name; b.classList.toggle("active",on); if(on) b.setAttribute("aria-current","page"); else b.removeAttribute("aria-current"); });
+  document.querySelectorAll("#navigation button,#dock button").forEach(b=>{
+    const on=b.dataset.module===name; b.classList.toggle("active",on);
+    if(on) b.setAttribute("aria-current","page"); else b.removeAttribute("aria-current"); });
   $("#crumb").textContent = name.toUpperCase();
   $("#view-command").hidden = name!=="Command";
   $("#view-fitness").hidden = name!=="Fitness";
@@ -2017,7 +2157,10 @@ function show(name){
     Reselling:["Business","Reselling.","Sales logged."],
     Money:["Finances","Money.","What's going out."],
   }[name];
-  $("#eyebrow").textContent = heads[0]; $("#title").innerHTML = esc(heads[1]).replace(/\.$/,'<span>.</span>'); $("#subtitle").textContent = heads[2];
+  // The page title lived in a heading block that has been removed; the bar
+  // carries the section name, and the description stays for screen readers.
+  $("#subtitle").textContent = `${heads[1]} ${heads[2]}`;
+  document.title = `${heads[1].replace(/\.$/,"")} · Chaston's dashboard`;
   if(name==="Command") renderCommand();
   else if(name==="Planner") renderPlanner();
   else if(name==="Calendar") renderCalendar();
@@ -2034,7 +2177,7 @@ function ring(value, target, label, unit){
   const fmt=n=>Math.round(n)>=10000?Math.round(n).toLocaleString():String(Math.round(n));
   return `<div class="ring" role="img" aria-label="${esc(label)}: ${fmt(value)} of ${fmt(target)}${esc(unit||"")}">
     <svg width="118" height="118" viewBox="0 0 118 118" aria-hidden="true" focusable="false">
-    <circle cx="59" cy="59" r="${r}" fill="none" stroke="rgba(155,92,255,.16)" stroke-width="7"/>
+    <circle cx="59" cy="59" r="${r}" fill="none" stroke="rgba(255,59,78,.16)" stroke-width="7"/>
     <circle cx="59" cy="59" r="${r}" fill="none" stroke="var(--accent)" stroke-width="7" stroke-linecap="round"
       stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}"/>
   </svg><div class="val" aria-hidden="true"><b>${fmt(value)}</b><small>${label}<br/>/${fmt(target)}${unit||""}</small></div></div>`;
@@ -2046,110 +2189,271 @@ function sparkline(trendSeries){
   const vals=pts.map(p=>p.trend); const min=Math.min(...vals), max=Math.max(...vals);
   const span=(max-min)||1, W=280, H=52;
   const d=pts.map((p,i)=>`${i?"L":"M"}${(i/(pts.length-1)*W).toFixed(1)},${(H-((p.trend-min)/span)*H).toFixed(1)}`).join(" ");
-  return `<svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true" focusable="false" style="margin-top:12px;overflow:visible">
+  return `<svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true" focusable="false" style="margin-top:10px;height:44px;overflow:visible">
     <path d="${d}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
 }
+
+// ============================================================================
+// VISUALISATION PRIMITIVES
+//
+// One shape per kind of question, so no two metrics are read the same way:
+// a radial for one number chasing one goal, a segmented bar for parts of a
+// whole, a fill for a vessel, a sparkline for a direction, a timeline for a
+// day, a checklist for things to tick. Command sets these; every other screen
+// uses them rather than inventing another card.
+// ============================================================================
+
+/** One number chasing one goal, drawn big. */
+function radial(value, target, unit){
+  const pct = target>0 ? Math.min(1, value/target) : 0;
+  const r=64, c=2*Math.PI*r;
+  const fmt=n=>Math.round(n).toLocaleString();
+  return `<div class="radial" role="img" aria-label="${fmt(value)} of ${fmt(target)}${esc(unit||"")}">
+    <svg viewBox="0 0 150 150" aria-hidden="true">
+      <circle cx="75" cy="75" r="${r}" fill="none" stroke="rgba(255,255,255,.055)" stroke-width="10"/>
+      <circle cx="75" cy="75" r="${r}" fill="none" stroke="var(--accent)" stroke-width="10"
+        stroke-linecap="round" stroke-dasharray="${c.toFixed(1)}"
+        stroke-dashoffset="${(c*(1-pct)).toFixed(1)}" style="transition:stroke-dashoffset var(--dur-slow) ease"/>
+    </svg>
+    <div class="rd-read" aria-hidden="true"><b>${fmt(value)}</b><span>OF ${fmt(target)}</span></div>
+  </div>`;
+}
+
+/** Parts of a whole — macros, spend, anything that splits. */
+function segbar(parts){
+  const total=parts.reduce((a,p)=>a+(+p.v||0),0)||1;
+  return `<div class="seg" role="img" aria-label="${parts.map(p=>`${p.label} ${Math.round(p.v)}${p.unit||""}`).join(", ")}">
+      ${parts.map(p=>`<i style="width:${(p.v/total*100).toFixed(1)}%;background:${p.color}"></i>`).join("")}
+    </div>
+    <div class="seg-key" aria-hidden="true">
+      ${parts.map(p=>`<span><span class="sw" style="background:${p.color}"></span>${esc(p.label)} <b>${Math.round(p.v)}${p.unit||""}</b></span>`).join("")}
+    </div>`;
+}
+
+/** A vessel filling up. */
+function fillGauge(value, target, unit){
+  const pct=target>0?Math.min(100,Math.round(value/target*100)):0;
+  return `<div class="gauge" role="img" aria-label="${Math.round(value)} of ${Math.round(target)} ${esc(unit)}">
+    <div class="fill"><i style="height:${pct}%"></i></div>
+    <div class="rd" aria-hidden="true">
+      <span class="n-big">${Math.round(value)}</span>
+      <span class="m-meta">${pct}% of ${Math.round(target)} ${esc(unit)}</span>
+    </div>
+  </div>`;
+}
+
+/** The day ahead as hours, not rows. */
+function timeline(items){
+  if(!items.length) return `<p class="m-meta" style="padding:8px 0">Nothing scheduled.</p>`;
+  return `<div class="tl">${items.map(i=>`
+    <div class="tl-row${i.late?" late":""}${i.done?" done":""}">
+      <span class="at">${esc(i.at)}</span>
+      <span class="pip" style="${i.color?`background:${i.color}`:""}"></span>
+      <span class="what">${esc(i.title)}${i.sub?`<small>${esc(i.sub)}</small>`:""}</span>
+    </div>`).join("")}</div>`;
+}
+
+/** Things to tick, ticked here. */
+function checklist(tasks){
+  if(!tasks.length) return `<p class="m-meta" style="padding:8px 0">Nothing on the list.</p>`;
+  return `<div class="cl">${tasks.map(t=>{
+    const late=isDateKey(t.due)&&dayDelta(t.due)<0;
+    const lab=isDateKey(t.due)?dateLabel(t.due):"";
+    return `<div class="cl-row${t.done?" on":""}">
+      <button type="button" class="cl-box" data-tick="${esc(t.id)}"
+        aria-pressed="${!!t.done}" aria-label="Mark ${esc(t.title)} done">${icon("check")}</button>
+      <span class="txt">${esc(t.title)}</span>
+      ${lab?`<span class="tag2${late?" late":""}">${esc(lab.toUpperCase())}</span>`:""}
+    </div>`;}).join("")}</div>`;
+}
+
+/** Wire the checklist in a container back to the task store. */
+function wireTicks(root, after){
+  root.querySelectorAll("[data-tick]").forEach(b=>b.onclick=()=>{
+    const l=DB.get("tasks",[]); const t=l.find(x=>x.id===b.dataset.tick);
+    if(t){ t.done=!t.done; DB.set("tasks",l); }
+    after();
+  });
+}
+
+/** A square icon control, the quick-action wall from the reference panels. */
+const ctrl = a => `<button type="button" class="ctrl" data-act="${esc(a.label)}">
+  ${icon(a.ic)}<b>${esc(a.label)}</b></button>`;
 
 // ============================================================================
 // VIEWS
 // ============================================================================
 function renderCommand(){
-  const day=todayKey(); const foodLog=DB.get("foodLog",{}); const totals=foodTotals(foodLog[day]); const t=getTargets();
-  const proteinLeft=Math.max(0,Math.round(t.protein-totals.protein));
+  const day=todayKey();
+  const foodLog=DB.get("foodLog",{}); const totals=foodTotals(foodLog[day]); const t=getTargets();
+  const kcalLeft=Math.round(t.calories-totals.calories);
+  const steps=+getSteps()[day]||0, stepGoal=getStepGoal();
+  const water=waterOn(day), waterGoal=getWaterGoal(), wu=WATER_UNITS[getWaterUnit()];
   const coach=runCoach();
-  const next=upNext(5);
+  const training=plannedToday();
+  const doneToday=training.filter(r=>trainedOn(day, r.kind)).length;
+  const trend=computeTrend(weightSeries(DB.get("weighins",{})));
+  const trendNow=trend.length?trend[trend.length-1].trend:null;
+  const rate=weeklyRate(trend);
+  const tasks=DB.get("tasks",[]);
+  const openTasks=tasks.filter(x=>!x.done)
+    .sort((a,b)=>dateSort(a.due)-dateSort(b.due)||(PRIO_RANK[a.priority]??1)-(PRIO_RANK[b.priority]??1));
+  const overdue=openTasks.filter(x=>isDateKey(x.due)&&dayDelta(x.due)<0).length;
+  const dt=dayTypeFor();
+
+  // Money in and out this month, from the two stores that already hold it.
+  const month=day.slice(0,7);
+  const inMonth=l=>l.filter(e=>!e.date||String(e.date).startsWith(month));
+  const sales=inMonth(DB.get("sales",[])).reduce((a,e)=>a+(+e.amount||0),0);
+  const spend=inMonth(DB.get("expenses",[])).reduce((a,e)=>a+(+e.amount||0),0);
+  const recent=[...DB.get("sales",[]).map(e=>({...e,inflow:true})), ...DB.get("expenses",[])]
+    .filter(e=>+e.amount).slice(0,4);
+
+  // Today and tomorrow as a timeline: events, training, and anything due.
+  const tlItems=[];
+  [0,1].forEach(off=>{
+    const d=new Date(); d.setDate(d.getDate()+off); const k=todayKey(d);
+    DB.get("events",[]).concat(gcalEvents()).filter(e=>e.date===k).forEach(e=>tlItems.push({
+      at:e.time||(off?"TMRW":"—"), title:e.title, sub:off?"Tomorrow":(e.location||e.calendar||""), sort:(off*2400)+timeNum(e.time)}));
+    trainingOn(k).forEach(x=>tlItems.push({
+      at:off?"TMRW":"TODAY", title:x.title, sub:`${kindLabel(x.routine.kind)} · program`,
+      done:x.done, color:"var(--mac-protein)", sort:(off*2400)+2300}));
+  });
+  tlItems.sort((a,b)=>a.sort-b.sort);
 
   $("#view-command").innerHTML = `
-    <div class="hero">
-      <div class="hero-copy">
-        <p class="eyebrow">${esc(new Date().toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"}).toUpperCase())}</p>
-        <h2>Good ${greeting()}, <span>Chaston</span>.</h2>
-        <p>${esc(coach[0][0])}</p>
-      </div>
-      ${orbitalCore(proteinLeft, "G PROTEIN", `${proteinLeft} grams of protein left today`)}
+    <div class="strip" style="margin-bottom:10px">
+      ${st(steps>=stepGoal?"ok":steps?"":"off","Steps",steps.toLocaleString())}
+      ${st(totals.protein>=t.protein?"ok":totals.protein?"":"off","Protein",`${Math.round(totals.protein)}g`)}
+      ${st(water>=waterGoal?"ok":water?"":"off","Water",`${Math.round(water/wu.per)} ${wu.label}`)}
+      ${training.length?st(doneToday>=training.length?"ok":"","Training",doneToday>=training.length?"done":`${doneToday}/${training.length}`):st("off","Training","rest")}
+      ${overdue?st("","Overdue",`${overdue}`):""}
+      ${dt?st("","Cycle",getDayTypes()[dt].label):""}
+      ${gcalConnected()?st("ok","Google","synced"):""}
     </div>
 
-    <div class="panel">
-      <div class="section-title">
-        <h2 id="qa-heading">Quick actions</h2>
-        <div class="tabs" id="qa-tabs" role="tablist" aria-labelledby="qa-heading"></div>
-      </div>
-      <div class="actions" id="actions" role="tabpanel" tabindex="0"></div>
-    </div>
-
-    <div class="grid cols-2">
-      <div class="panel">
-        <div class="section-title"><h2>Coach</h2><span class="tag">SIGNALS</span></div>
-        ${coach.map(c=>`<p class="coach-line coach-${c[1]}">${esc(c[0])}</p>`).join("")}
-      </div>
-      <div class="panel">
-        <div class="section-title"><h2>Daily vitals</h2>
-          ${dayTypeFor() ? `<span class="tag">${esc(getDayTypes()[dayTypeFor()].label.toUpperCase())} DAY</span>` : ""}
-          <button class="ghost" onclick="show('Food')">Open →</button></div>
-        <div class="rings">
-          ${ring(totals.calories,t.calories,"KCAL","")}
-          ${ring(totals.protein,t.protein,"PROTEIN","g")}
-          ${ring(+getSteps()[day]||0,getStepGoal(),"STEPS","")}
+    <div class="bento">
+      <!-- PRIMARY: what today is -->
+      <section class="mod key c5 r2">
+        <span class="m-key">${esc(new Date().toLocaleDateString(undefined,{weekday:"long",month:"short",day:"numeric"}).toUpperCase())}</span>
+        <h2 style="margin:0;font-size:clamp(22px,2vw,30px);font-weight:500;letter-spacing:-.7px;line-height:1.1">
+          Good ${greeting()}, <span class="accent">Chaston</span>.</h2>
+        <div style="margin-top:6px">
+          <span class="m-key">ON THE PROGRAM</span>
+          <p class="n-big" style="margin:5px 0 0;font-size:clamp(20px,1.8vw,27px)">${training.length
+            ? esc(training.map(r=>r.name).join(" + "))
+            : `<span style="color:var(--muted);font-weight:400">Rest day</span>`}</p>
+          <p class="m-meta" style="margin:4px 0 0">${training.length
+            ? (doneToday>=training.length?"All logged":`${doneToday} of ${training.length} logged`)
+            : "Nothing scheduled this weekday"}</p>
         </div>
-      </div>
-    </div>
+        <div class="m-foot" style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="primary" onclick="show('Fitness')">Open training</button>
+          <button class="btn" onclick="show('Food')">Log food</button>
+        </div>
+      </section>
 
-    <div class="panel">
-      <div class="section-title"><h2>Up next</h2>
-        <span class="row" style="gap:14px">
-          <button class="ghost" onclick="show('Planner')">Planner →</button>
-          <button class="ghost" onclick="show('Calendar')">Calendar →</button>
-        </span></div>
-      ${next.length ? next.map(n=>{
-        const late=isDateKey(n.date)&&dayDelta(n.date)<0;
-        const now=n.date===todayKey();
-        const when=isDateKey(n.date) ? dateLabel(n.date)+(n.time?` · ${n.time}`:"") : null;
-        const prio=(n.prio==="high"||n.prio==="low")?n.prio:"";
-        return `<div class="entry">
-          <span class="upnext-ic" title="${n.kind==="task"?"Task":"Event"}">${icon(n.icon)}</span>
-          ${prio?`<span class="prio ${prio}" role="img" aria-label="${prio==="high"?"High":"Low"} priority"></span>`:""}
-          <div class="body"><strong>${esc(n.title)}</strong>${n.notes?`<p>${esc(n.notes)}</p>`:""}</div>
-          ${when?`<span class="due${late?" late":now?" now":""}">${esc(when.toUpperCase())}</span>`:""}
-        </div>`; }).join("")
-      : `<p class="empty">Nothing queued. Add a task or an event.</p>`}
+      <!-- PRIMARY: steps, as a radial -->
+      <button class="mod c3 r2 half" onclick="show('Steps')">
+        <span class="m-head">${icon("steps")} Steps</span>
+        ${radial(steps, stepGoal, " steps")}
+        <span class="m-meta m-foot">${steps>=stepGoal
+          ? "Goal hit" : `${(stepGoal-steps).toLocaleString()} to go`}</span>
+      </button>
+
+      <!-- PRIMARY: calories as headroom, macros as a split -->
+      <button class="mod c4 r2 half" style="justify-content:space-between" onclick="show('Food')">
+        <span class="m-head">${icon("food")} Calories
+          <span class="sp"></span><span class="m-key">${dt?esc(getDayTypes()[dt].label.toUpperCase())+" DAY":""}</span></span>
+        <span class="n-hero">${kcalLeft>=0?kcalLeft.toLocaleString():`+${Math.abs(kcalLeft).toLocaleString()}`}<span class="n-u">${kcalLeft>=0?"left":"over"}</span></span>
+        <span class="m-meta">${Math.round(totals.calories).toLocaleString()} of ${Math.round(t.calories).toLocaleString()} kcal</span>
+        <div class="m-foot" style="display:flex;flex-direction:column;gap:8px">
+          ${segbar([
+            {label:"Protein", v:totals.protein, unit:"g", color:"var(--mac-protein)"},
+            {label:"Carbs",   v:totals.carbs,   unit:"g", color:"var(--mac-carbs)"},
+            {label:"Fat",     v:totals.fat,     unit:"g", color:"var(--mac-fat)"},
+          ])}
+        </div>
+      </button>
+
+      <!-- PRIMARY: the day as a timeline -->
+      <section class="mod c4 r2">
+        <span class="m-head">${icon("calendar")} Next up
+          <span class="sp"></span><button class="ghost" onclick="show('Calendar')">Calendar →</button></span>
+        ${timeline(tlItems.slice(0,7))}
+      </section>
+
+      <!-- PRIMARY: tasks you can tick right here -->
+      <section class="mod c4 r2">
+        <span class="m-head">${icon("planner")} Tasks
+          <span class="sp"></span><span class="m-key">${openTasks.length} OPEN${overdue?` · ${overdue} LATE`:""}</span></span>
+        ${checklist(openTasks.slice(0,7))}
+        <button class="ghost m-foot" onclick="show('Planner')" style="align-self:flex-start">All tasks →</button>
+      </section>
+
+      <!-- SECONDARY: water as a vessel -->
+      <button class="mod c2 r2 half" onclick="show('Food')">
+        <span class="m-head">${icon("water")} Water</span>
+        ${fillGauge(water/wu.per, waterGoal/wu.per, wu.label)}
+      </button>
+
+      <!-- SECONDARY: weight as a direction -->
+      <button class="mod c2 r2 half" onclick="show('Fitness')">
+        <span class="m-head">${icon("weight")} Weight</span>
+        <span class="n-big">${trendNow!=null?nfmt(trendNow):"—"}<span class="n-u">lb</span></span>
+        <span class="m-meta">${rate!=null?`${rate>0?"+":"−"}${Math.abs(rate).toFixed(1)} a week`:"trend"}</span>
+        <div class="m-foot">${trend.length>2?sparkline(trend):`<span class="m-meta">Log a weigh-in</span>`}</div>
+      </button>
+
+      <!-- TERTIARY: the control wall -->
+      <section class="mod c6 r2">
+        <span class="m-head">${icon("bolt")} Controls
+          <span class="sp"></span><div class="tabs" id="qa-tabs" role="tablist" aria-label="Action groups"></div></span>
+        <div class="ctrls" id="actions" role="tabpanel" tabindex="0"></div>
+      </section>
+
+      <!-- SECONDARY: what the coach can see -->
+      <section class="mod c3 r2 half">
+        <span class="m-head">${icon("command")} Signals</span>
+        <div class="scroller" style="max-height:none">
+          ${coach.map(c=>`<p class="coach-line coach-${c[1]}" style="margin:0 0 2px">${esc(c[0])}</p>`).join("")}
+        </div>
+      </section>
+
+      <!-- SECONDARY: money in, money out -->
+      <button class="mod c3 r2 half" onclick="show('Money')">
+        <span class="m-head">${icon("money")} This month</span>
+        <span class="n-big">${sales-spend>=0?"":"−"}$${Math.abs(sales-spend).toLocaleString()}</span>
+        <span class="m-meta">net · ${month}</span>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:2px">
+          ${segbar([
+            {label:"In",  v:sales, unit:"", color:"var(--success)"},
+            {label:"Out", v:spend, unit:"", color:"var(--accent)"},
+          ])}
+        </div>
+        <div class="scroller m-foot" style="max-height:none">
+          ${recent.length ? recent.map(r=>`<div class="cl-row" style="padding:5px 0">
+              <span class="txt" style="font-size:12.5px">${esc(r.title)}</span>
+              <span class="tag2" style="color:${r.inflow?"var(--success)":"var(--muted)"}">${r.inflow?"+":"−"}$${Math.abs(+r.amount||0).toLocaleString()}</span>
+            </div>`).join("")
+          : `<span class="m-meta">Nothing logged yet.</span>`}
+        </div>
+      </button>
     </div>`;
 
   renderActions();
+  wireTicks($("#view-command"), renderCommand);
 }
+
+/** Minutes since midnight, for sorting a timeline. Undated sorts last. */
+const timeNum = t => /^\d{1,2}:\d{2}$/.test(t||"") ? (+t.split(":")[0]*100 + +t.split(":")[1]) : 2350;
+/** One status pill. */
+const st = (state,label,value) =>
+  `<span class="st"><span class="dot ${esc(state)}"></span>${esc(label)} <b>${esc(value)}</b></span>`;
+
 const greeting=()=>{ const h=new Date().getHours(); return h<12?"morning":h<17?"afternoon":"evening"; };
 
-/**
- * The slow decorative orbital core. It is decoration, not a sensor reading —
- * the only real number in it is the one passed in, which is also spelled out
- * for screen readers. Rings use pathLength="360" so the dash patterns divide
- * evenly whatever the radius, and each spinning ring is its own <g> because
- * CSS rotation needs a fill-box origin to turn about its own centre.
- */
-function orbitalCore(value, label, description){
-  return `<div class="core-wrap">
-    <svg viewBox="0 0 200 200" aria-hidden="true" focusable="false">
-      <defs><radialGradient id="core-glow" cx="50%" cy="50%" r="50%">
-        <stop offset="0%" stop-color="#9b5cff" stop-opacity=".50"/>
-        <stop offset="55%" stop-color="#9b5cff" stop-opacity=".10"/>
-        <stop offset="100%" stop-color="#9b5cff" stop-opacity="0"/>
-      </radialGradient></defs>
-      <circle cx="100" cy="100" r="66" fill="url(#core-glow)"/>
-      <g class="spin-a"><circle cx="100" cy="100" r="94" pathLength="360" fill="none"
-        stroke="#9b5cff" stroke-opacity=".40" stroke-width="1" stroke-dasharray="1 4"/></g>
-      <g class="spin-b"><circle cx="100" cy="100" r="84" pathLength="360" fill="none"
-        stroke="#9b5cff" stroke-opacity=".55" stroke-width="6" stroke-dasharray="1.5 10.5"/></g>
-      <g class="spin-c"><circle cx="100" cy="100" r="70" pathLength="360" fill="none" stroke-linecap="round"
-        stroke="#9b5cff" stroke-opacity=".80" stroke-width="2" stroke-dasharray="72 108"/></g>
-      <circle cx="100" cy="100" r="54" fill="none" stroke="#e8dfff" stroke-opacity=".40" stroke-width="1"/>
-      <circle cx="100" cy="100" r="43" fill="none" stroke="#9b5cff" stroke-opacity=".26" stroke-width="1"/>
-      <path d="M4 100h20M176 100h20M100 4v20M100 176v20" stroke="#9b5cff" stroke-opacity=".26" stroke-width="1"/>
-    </svg>
-    <div class="core-read">
-      <b aria-hidden="true">${esc(value)}</b><small aria-hidden="true">${esc(label)}</small>
-      <span class="sr-only">${esc(description)}</span>
-    </div>
-  </div>`;
-}
+
 
 // ---- Quick actions: All / Personal / Planning / Business ----
 //
@@ -2186,8 +2490,9 @@ function renderActions(){
   box.setAttribute("aria-labelledby","qa-tab-"+actionGroup);
   const list = actionGroup==="All" ? ACTIONS : ACTIONS.filter(a=>a.group===actionGroup);
   list.forEach(a=>{
-    const b=document.createElement("button"); b.type="button"; b.className="action";
-    b.innerHTML=`${icon(a.icon)}<span class="txt"><strong>${esc(a.label)}</strong><small>${esc(a.desc)}</small></span>${icon("arrow","i arrow")}`;
+    const b=document.createElement("button"); b.type="button"; b.className="ctrl";
+    b.title=a.desc;
+    b.innerHTML=`${icon(a.icon)}<b>${esc(a.label)}</b>`;
     b.onclick=()=>runAction(a); box.append(b);
   });
 }
@@ -2298,7 +2603,8 @@ function fitToday(today, mma){
   const weekMin=week.reduce((a,s)=>a+(+s.minutes||0),0);
   const dayKey=todayKey();
   return `
-    <div class="panel">
+    <div class="bento">
+    <div class="panel c8 r2">
       <div class="section-title"><h2>On the program today</h2>
         <button class="ghost" onclick="fitTab='program';renderFitness()">Edit the week →</button></div>
       ${today.length ? today.map(r=>{
@@ -2322,18 +2628,18 @@ function fitToday(today, mma){
       : `<p class="empty">Nothing on the program today. Rest is part of it — or log something anyway and it counts as extra.</p>`}
     </div>
 
-    <div class="grid cols-2">
-      <div class="panel">
+      <div class="panel c4">
         <div class="section-title"><h2>This week</h2></div>
         <p class="big">${weekMin} min <span class="muted" style="font-size:15px">· ${week.length} session${week.length===1?"":"s"}</span></p>
         <p class="muted" style="margin:2px 0 0">${hardWithin(mma,7)} hard · training load ${totalLoad(week)}</p>
       </div>
-      <div class="panel">
+      <div class="panel c4">
         <div class="section-title"><h2>Coach</h2><span class="tag">SIGNALS</span></div>
         ${runCoach().map(c=>`<p class="coach-line coach-${c[1]}">${esc(c[0])}</p>`).join("")}
       </div>
     </div>`;
 }
+
 
 /** The week, and the routines it draws from. */
 function fitProgram(){
@@ -2418,7 +2724,7 @@ function fitHistory(mma, lifts){
   const trendWeight=trendSeries.length?trendSeries[trendSeries.length-1].trend:null;
   const rate=weeklyRate(trendSeries);
   return `
-    <div class="panel">
+    <div class="bento"><div class="panel c5 r2">
       <div class="section-title"><h2>Weight</h2><button class="btn" id="f-weight">Log weight</button></div>
       ${trendWeight!=null ? `
         <p class="big">${trendWeight.toFixed(1)} <span class="muted" style="font-size:15px">lbs trend</span></p>
@@ -2428,7 +2734,7 @@ function fitHistory(mma, lifts){
       ` : `<p class="empty">No weigh-ins yet. Log one, or import from Obsidian.</p>`}
     </div>
 
-    <div class="panel">
+    <div class="panel c4">
       <div class="section-title"><h2>Recent sessions</h2></div>
       <div id="mat-list">${mma.length ? mma.slice(0,10).map(s=>`
         <div class="entry"><div class="body"><strong>${esc(discLabel(s.discipline))} · ${s.minutes} min · ${esc(inten(s.intensity)?.label||s.intensity)}</strong>
@@ -2437,7 +2743,7 @@ function fitHistory(mma, lifts){
         : `<p class="empty">No sessions yet.</p>`}</div>
     </div>
 
-    <div class="panel">
+    <div class="panel c3">
       <div class="section-title"><h2>Recent lifts</h2></div>
       <div>${lifts.length ? lifts.slice(0,10).map(w=>`
         <div class="entry"><div class="body">
@@ -2448,8 +2754,9 @@ function fitHistory(mma, lifts){
       <div class="row" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--rim)">
         <button class="btn" id="f-obsidian">Import Obsidian</button>
       </div>
-    </div>`;
+    </div></div>`;
 }
+
 
 // ---- Assigning routines to a day ----
 function openAssignDay(dayLabel){
@@ -2616,7 +2923,8 @@ function foodToday(day, foods, totals, t, sp, dayType, types){
   if(loose.length) groups.push({name:"Uncategorised", items:loose, loose:true});
 
   return `
-    <div class="panel">
+    <div class="bento">
+    <div class="panel c8 r2">
       <div class="split">
         <div class="split-a">
           <div class="macro-row">
@@ -2640,7 +2948,7 @@ function foodToday(day, foods, totals, t, sp, dayType, types){
       </div>
     </div>
 
-    <div class="panel">
+    <div class="panel c4 r2">
       <div class="section-title"><h2>Water</h2><button class="ghost" id="water-settings">Goal &amp; unit</button></div>
       <div class="row" style="gap:20px;flex-wrap:wrap">
         ${ring(inUnit(w), inUnit(wGoal), "WATER", " "+u.label)}
@@ -2656,7 +2964,7 @@ function foodToday(day, foods, totals, t, sp, dayType, types){
       </div>
     </div>
 
-    <div class="panel">
+    <div class="panel c12">
       <div class="section-title"><h2>${isToday()?"Today's meals":"Meals that day"}</h2><span class="tag">${foods.length} ITEM${foods.length===1?"":"S"}</span></div>
       ${groups.map(g=>{
         const kcal=Math.round(g.items.reduce((a,x)=>a+(+x.f.calories||0),0));
@@ -2682,7 +2990,7 @@ function foodToday(day, foods, totals, t, sp, dayType, types){
         <button class="btn" id="food-obsidian">Import Obsidian</button>
         <button class="ghost" id="food-targets">${carbCycleOn()?"Edit day types":"Edit targets"}</button>
       </div>
-    </div>`;
+    </div></div>`;
 }
 
 /** The rotation, on its own screen instead of buried under the day. */
@@ -2878,7 +3186,7 @@ function donut(n){
   const arcs=MACROS.map(arc).join("");
   return `<div class="donut" role="img" aria-label="${Math.round(+n.calories||0)} calories: ${sp.carbs}% carbs, ${sp.fat}% fat, ${sp.protein}% protein">
     <svg viewBox="0 0 150 150" aria-hidden="true" focusable="false">
-      <circle cx="75" cy="75" r="60" fill="none" stroke="rgba(155,92,255,.14)" stroke-width="13"/>
+      <circle cx="75" cy="75" r="60" fill="none" stroke="rgba(255,59,78,.14)" stroke-width="13"/>
       <g transform="rotate(-90 75 75)">${arcs}</g>
     </svg>
     <div class="mid" aria-hidden="true"><b>${Math.round(+n.calories||0).toLocaleString()}</b><small>CAL</small></div>
@@ -2922,63 +3230,97 @@ function renderSteps(){
   const days=stepDays(7, day);
   const max=Math.max(goal, ...days.map(d=>d.count)) || goal;
   const hit=days.filter(d=>d.count>=goal).length;
-  const avg=Math.round(days.reduce((a,d)=>a+d.count,0)/days.length);
+  const week=days.reduce((a,d)=>a+d.count,0);
+  const avg=Math.round(week/days.length);
+  const best=days.reduce((b,d)=>(!b||d.count>b.count)?d:b, null);
+  const left=Math.max(0, goal-today);
+  const all=getSteps();
   // The URL a Shortcut should open. origin+pathname so it works on the real
   // domain and from a local file alike.
   const pushUrl=`${location.origin}${location.pathname}?steps=`;
 
   $("#view-steps").innerHTML = `
-    <div class="grid cols-2">
-      <div class="panel">
-        <div class="section-title"><h2>${isToday()?"Today":"That day"}</h2>${dayStrip()}<button class="primary" id="st-add">Log steps</button></div>
-        <div class="rings">${ring(today,goal,"STEPS","")}</div>
-        <p class="muted" style="margin:10px 0 0">
-          ${today>=goal ? `Goal hit — ${today.toLocaleString()} steps.`
-                        : `${(goal-today).toLocaleString()} to go of ${goal.toLocaleString()}.`}
-        </p>
-        <button class="ghost" id="st-goal">Change goal</button>
-      </div>
-      <div class="panel">
-        <div class="section-title"><h2>${isToday()?"Last 7 days":"7 days to then"}</h2><span class="tag">${hit}/7 HIT</span></div>
+    <div class="strip" style="margin-bottom:10px">
+      ${dayStrip()}
+      ${st(today>=goal?"ok":today?"":"off", isToday()?"Today":"That day", today.toLocaleString())}
+      ${st(hit>=4?"ok":hit?"":"off","Goal hit",`${hit} of 7`)}
+      ${st(avg>=goal?"ok":"off","Average",avg.toLocaleString())}
+      ${st("off","Week",week.toLocaleString())}
+    </div>
+
+    <div class="bento">
+      <button class="mod key c4 r3 half" id="st-add">
+        <span class="m-head">${icon("steps")} ${isToday()?"Today":"That day"}</span>
+        ${radial(today, goal, " steps")}
+        <span class="n-big m-foot" style="font-size:20px">${today>=goal
+          ? `<span class="accent">Goal hit</span>`
+          : `${left.toLocaleString()}<span class="n-u">to go</span>`}</span>
+        <span class="m-meta">Tap to log ${isToday()?"today":"that day"}</span>
+      </button>
+
+      <section class="mod c5 r3">
+        <span class="m-head">${icon("bolt")} ${isToday()?"Last 7 days":"7 days to then"}
+          <span class="sp"></span><span class="m-key">${hit}/7 HIT</span></span>
         <div class="bars">
           ${days.map(d=>`<div class="bar-col">
-            <div class="bar-track"><div class="bar-fill${d.count>=goal?" bar-hit":""}" style="height:${Math.round((d.count/max)*100)}%"></div></div>
+            <div class="bar-track"><div class="bar-fill${d.count>=goal?" bar-hit":""}"
+              style="height:${Math.round((d.count/max)*100)}%"></div></div>
             <span class="bar-lab">${d.label}</span></div>`).join("")}
         </div>
-        <p class="muted" style="margin:10px 0 0">Average ${avg.toLocaleString()} / day</p>
+        <span class="m-meta m-foot">Average ${avg.toLocaleString()} a day${best&&best.count?` · best ${best.count.toLocaleString()} on ${esc(best.label)}`:""}</span>
+      </section>
+
+      <button class="mod c3 half" id="st-goal">
+        <span class="m-head">${icon("check")} Daily goal</span>
+        <span class="n-big">${goal.toLocaleString()}</span>
+        <span class="m-meta m-foot">Tap to change</span>
+      </button>
+      <div class="mod c3 half">
+        <span class="m-head">${icon("arrow")} Average</span>
+        <span class="n-big">${avg.toLocaleString()}</span>
+        <span class="m-meta m-foot">${avg>=goal?"above goal":`${(goal-avg).toLocaleString()} under goal`}</span>
       </div>
-    </div>
+      <div class="mod c3 half">
+        <span class="m-head">${icon("verified")} Days logged</span>
+        <span class="n-big">${Object.keys(all).length}</span>
+        <span class="m-meta m-foot">all time</span>
+      </div>
 
-    <div class="panel">
-      <div class="section-title"><h2>Connect Apple Health</h2><span class="tag">IOS SHORTCUT</span></div>
-      <p class="muted" style="font-size:14px;margin:0 0 10px">
-        A web page can't read Apple Health directly — Health is a native API with no browser
-        access. An Apple Shortcut can, though: it reads today's step count and opens this page
-        with the number attached, which lands it here. No account, no server.
-      </p>
-      <ol class="muted" style="font-size:14px;line-height:1.8;padding-left:20px;margin:0">
-        <li>Open <strong>Shortcuts</strong> → <strong>+</strong> → add action <strong>Find Health Samples</strong>.</li>
-        <li>Set Type to <strong>Steps</strong>, Sort by <strong>Start Date</strong>, and filter to <strong>Today</strong>.</li>
-        <li>Add <strong>Calculate Statistics</strong> → <strong>Sum</strong> over those samples.</li>
-        <li>Add <strong>Open URLs</strong> and set the URL to the one below, with the Sum on the end.</li>
-        <li>Optional: under Automation, run it daily so it keeps itself up to date.</li>
-      </ol>
-      <label>URL to use in the Shortcut</label>
-      <input id="st-url" readonly value="${esc(pushUrl)}" onclick="this.select()" />
-      <p class="faint" style="font-size:12px;margin:8px 0 0">
-        Put the Sum variable directly after the <code>=</code>, e.g. <code>${esc(pushUrl)}12345</code>.
-        Add <code>&amp;date=YYYY-MM-DD</code> to backfill a past day.
-      </p>
-    </div>
+      <section class="mod c5 r2">
+        <span class="m-head">${icon("book")} History
+          <span class="sp"></span><span class="m-key">${Object.keys(all).length} DAYS</span></span>
+        <div class="scroller" style="max-height:none;flex:1">
+        ${(()=>{ const keys=Object.keys(all).sort().reverse().slice(0,30);
+          return keys.length ? keys.map(k=>`<div class="cl-row">
+            <span class="txt">${(+all[k]).toLocaleString()} steps</span>
+            <span class="tag2">${esc(new Date(k+"T12:00:00").toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"}))}${(+all[k])>=goal?" · HIT":""}</span>
+            <button type="button" class="del" data-stepdel="${esc(k)}" aria-label="Remove steps for ${esc(k)}">${icon("x")}</button>
+            </div>`).join("")
+          : `<p class="m-meta">No steps logged yet.</p>`; })()}
+        </div>
+      </section>
 
-    <div class="panel">
-      <div class="section-title"><h2>History</h2></div>
-      <div>${(()=>{ const all=Object.keys(getSteps()).sort().reverse().slice(0,14);
-        return all.length ? all.map(k=>`<div class="entry"><div class="body">
-          <strong>${(+getSteps()[k]).toLocaleString()} steps</strong>
-          <small>${esc(new Date(k+"T12:00:00").toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"}))}${(+getSteps()[k])>=goal?" · goal hit":""}</small>
-          </div><button type="button" class="del" data-stepdel="${esc(k)}" aria-label="Remove steps for ${esc(k)}">${icon("x")}</button></div>`).join("")
-        : `<p class="empty">No steps logged yet.</p>`; })()}</div>
+      <section class="mod c7 r2">
+        <span class="m-head">${icon("session")} Apple Health
+          <span class="sp"></span><span class="m-key">IOS SHORTCUT</span></span>
+        <p class="m-meta" style="font-size:13px;color:var(--muted)">
+          A web page can't read Apple Health directly — Health is a native API with no browser
+          access. A Shortcut can: it reads today's step count and opens this page with the number
+          attached, which lands it here. No account, no server.</p>
+        <details class="how">
+          <summary>Build the Shortcut</summary>
+          <ol>
+            <li>Open <b>Shortcuts</b> → <b>+</b> → add <b>Find Health Samples</b>.</li>
+            <li>Type <b>Steps</b>, sort by <b>Start Date</b>, filter to <b>Today</b>.</li>
+            <li>Add <b>Calculate Statistics</b> → <b>Sum</b> over those samples.</li>
+            <li>Add <b>Open URLs</b>, set the URL below, and put the Sum on the end.</li>
+            <li>Optional: under Automation, run it daily so it keeps itself current.</li>
+          </ol>
+          <p>Add <span class="mono">&amp;date=YYYY-MM-DD</span> to backfill a past day.</p>
+        </details>
+        <label for="st-url" class="m-foot">URL to use in the Shortcut</label>
+        <input id="st-url" readonly value="${esc(pushUrl)}" onclick="this.select()" />
+      </section>
     </div>`;
 
   daySubtitle("Today against your daily goal.", "{d} — against your daily goal.");
@@ -3033,21 +3375,21 @@ function renderPlanner(){
   const doneShown = taskFilter!=="open" ? done : [];
 
   $("#view-generic").innerHTML = `
-    <div class="grid cols-2">
-      <div class="panel">
+    <div class="bento">
+      <div class="panel c8">
         <div class="section-title"><h2>Open</h2><button class="primary" id="pl-add">Add task</button></div>
         <p class="big">${open.length} <span class="muted" style="font-size:15px">open</span></p>
         <p class="muted" style="margin:2px 0 0">
           ${overdue.length?`${overdue.length} overdue · `:""}${dueToday.length?`${dueToday.length} due today · `:""}${done.length} done
         </p>
       </div>
-      <div class="panel">
+      <div class="panel c4">
         <div class="section-title"><h2>Show</h2></div>
         <div class="tabs" id="pl-tabs" role="tablist" aria-label="Which tasks to show"></div>
       </div>
     </div>
 
-    <div class="panel">
+    <div class="panel c12">
       <div class="section-title"><h2>Tasks</h2><span class="tag">${list.length} SHOWN</span></div>
       ${groups.length||doneShown.length ? groups.map(g=>`
         <div class="group-head${g.late?" late":""}"><h3>${esc(g.label)}</h3><span class="meal-kcal">${g.items.length}</span></div>
@@ -3231,7 +3573,7 @@ async function gcalSync(token){
   const list=await gcalApi("users/me/calendarList", {maxResults:60, minAccessRole:"reader"}, token);
   const cals=(list.items||[]).map(c=>({
     id:c.id, name:c.summaryOverride||c.summary||c.id,
-    color:c.backgroundColor||"#9b5cff", primary:!!c.primary,
+    color:c.backgroundColor||"#ff3b4e", primary:!!c.primary,
   }));
   DB.set("gcalCalendars", cals);
   const hidden=gcalHidden();
@@ -3736,16 +4078,23 @@ function renderGeneric(name){
   const isMoney=(name==="Money"||name==="Reselling");
   const sum=isMoney?list.reduce((a,e)=>a+(+e.amount||0),0):0;
   $("#view-generic").innerHTML = `
-    <div class="panel">
+    <div class="bento">
+    ${isMoney?`<div class="mod key c4 r2">
+      <span class="m-head">${icon(name==="Money"?"money":"reselling")} ${esc(name)}</span>
+      <span class="n-hero">$${sum.toLocaleString()}</span>
+      <span class="m-meta">${list.length} ${esc(g.noun.toLowerCase())}${list.length===1?"":"s"} logged, all time</span>
+      <button class="primary m-foot" id="gen-add2" style="align-self:flex-start">Add ${esc(g.noun.toLowerCase())}</button>
+    </div>`:""}
+    <div class="panel ${isMoney?"c8 r2":"c12"}">
       <div class="section-title"><h2>${esc(name)}</h2><button class="primary" id="gen-add">Add ${esc(g.noun.toLowerCase())}</button></div>
-      ${isMoney?`<p class="big">$${sum.toLocaleString()}</p><p class="muted" style="margin:0 0 10px">${list.length} ${g.noun.toLowerCase()}${list.length===1?"":"s"} logged</p>`:""}
       <div>${list.length ? list.map(e=>`<div class="entry">
         ${name==="Planner"?`<button type="button" class="chip check-box${e.done?' on':''}" data-toggle="${e.id}" aria-pressed="${!!e.done}" aria-label="Mark ${esc(e.title)} done">${icon("check")}</button>`:""}
         <div class="body"><strong style="${e.done?'text-decoration:line-through;color:var(--muted)':''}">${esc(e.title)}${e.amount?` · $${esc(e.amount)}`:""}${e.when?` <span class="muted">· ${esc(e.when)}</span>`:""}</strong>
         ${e.notes?`<p>${esc(e.notes)}</p>`:""}</div>
         <button type="button" class="del" data-del="${e.id}" aria-label="Delete ${esc(e.title)}">${icon("x")}</button></div>`).join("") : `<p class="empty">Nothing here yet.</p>`}</div>
-    </div>`;
+    </div></div>`;
   $("#gen-add").onclick=()=>openEntry(name);
+  if($("#gen-add2")) $("#gen-add2").onclick=()=>openEntry(name);
   $("#view-generic").querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{ DB.set(g.store, DB.get(g.store,[]).filter(e=>e.id!==b.dataset.del)); renderGeneric(name); });
   $("#view-generic").querySelectorAll("[data-toggle]").forEach(b=>b.onclick=()=>{ const l=DB.get(g.store,[]); const e=l.find(x=>x.id===b.dataset.toggle); if(e){e.done=!e.done; DB.set(g.store,l);} renderGeneric(name); if(current!=="Planner")return; });
 }

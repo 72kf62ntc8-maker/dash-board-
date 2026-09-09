@@ -22,9 +22,15 @@ const COOKIE  = "cd_gate";
 const MAX_AGE = 60 * 60 * 24 * 30;      // 30 days, so a phone stays signed in
 const PURPOSE = "dashboard-gate-v1";    // bump to invalidate every cookie
 
+// The same exclusion, inside the function as well as in the matcher above.
+// Vercel applies the matcher before calling us; this makes the answer the
+// same if it ever did not, and lets the function be tested on its own.
+const OPEN_PATHS = /^\/(?:sw\.js$|manifest\.webmanifest$|icons\/)/;
+
 export default async function middleware(req){
-  const secret = process.env.DASH_PASSWORD;
   const url = new URL(req.url);
+  if(OPEN_PATHS.test(url.pathname)) return;      // installable and offline need these before sign-in
+  const secret = process.env.DASH_PASSWORD;
 
   // No password set: refuse to serve rather than quietly hand the dashboard
   // to the world. A gate that fails open is worse than no gate at all,

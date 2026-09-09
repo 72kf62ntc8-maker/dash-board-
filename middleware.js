@@ -12,7 +12,11 @@
 // table — the cookie is an HMAC of the password itself, so changing the
 // password signs everyone out on its own.
 // ============================================================================
-export const config = { matcher: ["/((?!_vercel/).*)"] };
+// Everything is gated except what the app shell needs before anyone has
+// signed in: the service worker, the manifest and the icons. They are what
+// make it installable and offline-capable, and gating them would break both
+// while protecting nothing — none of them holds any data.
+export const config = { matcher: ["/((?!_vercel/|sw\\.js$|manifest\\.webmanifest$|icons/).*)"] };
 
 const COOKIE  = "cd_gate";
 const MAX_AGE = 60 * 60 * 24 * 30;      // 30 days, so a phone stays signed in

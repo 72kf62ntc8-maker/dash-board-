@@ -5,6 +5,10 @@ no dependencies. Open it in a browser or deploy it as a static site (Vercel
 serves `index.html` at `/`). All data is stored locally in the browser under
 `cd_*` keys; nothing leaves the device.
 
+**It is private.** `middleware.js` runs on Vercel's edge before any of the
+dashboard is sent, so an unauthenticated visitor never receives the page at
+all. See [Locking it](#locking-it).
+
 ## Sections
 - **Command** — orbital-core hero, quick actions grouped into All / Personal /
   Planning / Business tabs, coach signals, daily vitals.
@@ -67,6 +71,33 @@ the day you are looking at. Command and the coach always speak about today.
 Command's **Up next** merges open tasks, scheduled events and today's and
 tomorrow's training into one ordered list, soonest first, and the coach counts
 anything overdue.
+
+## Locking it
+The dashboard sits on a public URL and holds a food log, a weight trend, income
+and a schedule, so it is gated. A password prompt written into `index.html`
+would be theatre — the browser has the page before that code runs, and View
+Source defeats it. `middleware.js` does the check on Vercel's edge instead,
+before a byte of the dashboard is sent.
+
+**Setup:** Vercel → the project → Settings → Environment Variables → add
+`DASH_PASSWORD` (no `VITE_` prefix — it must stay server-side) for all
+environments, then redeploy.
+
+- One shared password, no accounts. The cookie is an HMAC of the password
+  itself, so there is no session store, and changing the password signs every
+  device out on its own.
+- The cookie is `HttpOnly`, `Secure`, `SameSite=Lax`, 30 days — long enough
+  that a phone on the home screen stays signed in.
+- **With no `DASH_PASSWORD` set, nothing is served at all** — a 503 explaining
+  how to set one. A gate that fails open is worse than no gate, because you
+  believe it is there.
+- Preview deployments are gated too; the middleware runs on every deployment.
+- If Vercel's plan includes Deployment Protection, that is the zero-code
+  alternative and does the same job at the platform level.
+
+This protects the page, not the device. Anyone holding your unlocked phone
+still has the dashboard, because the data lives in that browser's
+`localStorage`.
 
 ## Google Calendar
 Calendar → Sources → Connect. Google needs an OAuth client ID for this site
